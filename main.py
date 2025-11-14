@@ -119,11 +119,15 @@ def webfinger():
                 response = client.get(actor_url, headers=headers)
                 response.raise_for_status()
                 actor_data = response.json()
+                # Extract domain from actor URL
+                parsed = urlparse(actor_url)
+                domain = parsed.netloc or ''
                 return jsonify({
                     "success": True,
                     "handle": actor_data.get('preferredUsername', ''),
                     "nickname": actor_data.get('name', ''),
-                    "id": actor_data.get('id', actor_url)
+                    "id": actor_data.get('id', actor_url),
+                    "domain": domain
                 })
 
             # Otherwise, try webfinger lookup
@@ -161,11 +165,15 @@ def webfinger():
                 response.raise_for_status()
                 actor_data = response.json()
 
+                # Extract domain from actor URL
+                parsed = urlparse(actor_url)
+                domain = parsed.netloc or ''
                 return jsonify({
                     "success": True,
                     "handle": actor_data.get('preferredUsername', ''),
                     "nickname": actor_data.get('name', ''),
-                    "id": actor_data.get('id', actor_url)
+                    "id": actor_data.get('id', actor_url),
+                    "domain": domain
                 })
             except httpx.HTTPError:
                 # If webfinger fails, try to use resource as direct actor URL
@@ -173,11 +181,15 @@ def webfinger():
                     response = client.get(resource, headers=headers)
                     response.raise_for_status()
                     actor_data = response.json()
+                    # Extract domain from resource URL
+                    parsed = urlparse(resource)
+                    domain = parsed.netloc or ''
                     return jsonify({
                         "success": True,
                         "handle": actor_data.get('preferredUsername', ''),
                         "nickname": actor_data.get('name', ''),
-                        "id": actor_data.get('id', resource)
+                        "id": actor_data.get('id', resource),
+                        "domain": domain
                     })
                 raise
 

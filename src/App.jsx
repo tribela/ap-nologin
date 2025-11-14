@@ -96,8 +96,11 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
 
   const parseAttributedTo = (data, actorInfo) => {
     if (actorInfo && (actorInfo.handle || actorInfo.nickname)) {
+      const handle = actorInfo.handle || '';
+      const domain = actorInfo.domain || '';
+      const fullHandle = handle && domain ? `@${handle}@${domain}` : handle ? `@${handle}` : '';
       return {
-        handle: actorInfo.handle || '',
+        handle: fullHandle,
         nickname: actorInfo.nickname || null,
         fallback: null
       };
@@ -115,14 +118,34 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
       const handle = data.attributedTo.preferredUsername || '';
       const nickname = data.attributedTo.name || null;
       const fallback = data.attributedTo.id || JSON.stringify(data.attributedTo);
-      return { handle, nickname, fallback };
+      // Try to extract domain from id URL
+      let domain = '';
+      if (data.attributedTo.id) {
+        try {
+          const url = new URL(data.attributedTo.id);
+          domain = url.hostname;
+        } catch (e) {
+          // Invalid URL, ignore
+        }
+      }
+      const fullHandle = handle && domain ? `@${handle}@${domain}` : handle ? `@${handle}` : '';
+      return { handle: fullHandle, nickname, fallback };
     }
 
     return { handle: null, nickname: null, fallback: null };
   };
 
-  if (!quoteUrl || depth >= maxDepth) {
+  if (!quoteUrl) {
     return null;
+  }
+
+  // If max depth exceeded, show simple "quoted content" message
+  if (depth >= maxDepth) {
+    return (
+      <div className="quote-object" style={{ marginLeft: `${depth * 20}px`, marginTop: '1rem', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
+        <div style={{ fontStyle: 'italic', color: '#666' }}>quoted content</div>
+      </div>
+    );
   }
 
   if (loading) {
@@ -143,7 +166,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
     };
     const color = errorColors[errorStatus.code] || '#d32f2f';
     return (
-      <div className="quote-object" style={{ marginLeft: `${depth * 20}px`, marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
+      <div className="quote-object" style={{ marginLeft: `${depth * 20}px`, marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
         <div style={{ color, fontWeight: 'bold' }}>
           {errorStatus.message} ({errorStatus.code})
         </div>
@@ -158,42 +181,26 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
   const { handle, nickname, fallback } = parseAttributedTo(quoteData, quoteActorInfo);
 
   return (
-    <div className="quote-object" style={{ marginLeft: `${depth * 20}px`, marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#f9f9f9' }}>
-      <div className="activitypub-info">
-        <h4>Quoted ({depth + 1}/{maxDepth})</h4>
-        <div className="info-grid">
-          {quoteData.type && (
-            <div className="info-item">
-              <strong>Type:</strong> <span className="type-badge">{quoteData.type}</span>
-            </div>
-          )}
-          {quoteData.id && (
-            <div className="info-item">
-              <strong>ID:</strong> <a href={quoteData.id} target="_blank" rel="noopener noreferrer">{quoteData.id}</a>
-            </div>
-          )}
-          {quoteData.published && (
-            <div className="info-item">
-              <strong>Published:</strong> {new Date(quoteData.published).toISOString()}
-            </div>
-          )}
+    <div className="content-html" style={{ marginLeft: `${depth * 20}px`, marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
+      {(quoteData.published || quoteData.attributedTo) && (
+        <div style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
           {quoteData.attributedTo && (
-            <div className="info-item">
-              <strong>Attributed To:</strong>{' '}
+            <>
               {nickname && <span className="nickname">{nickname}</span>}
               {nickname && handle && ' '}
-              {handle && <span className="handle">@{handle}</span>}
+              {handle && <span className="handle">{handle}</span>}
               {!handle && !nickname && fallback && <span>{fallback}</span>}
-            </div>
+            </>
           )}
-          {quoteData.content && (
-            <div className="info-item full-width">
-              <strong>Content:</strong>
-              <div className="content-html" dangerouslySetInnerHTML={{ __html: quoteData.content }} />
-            </div>
+          {quoteData.published && quoteData.attributedTo && ' • '}
+          {quoteData.published && (
+            <span>{new Date(quoteData.published).toISOString()}</span>
           )}
         </div>
-      </div>
+      )}
+      {quoteData.content && (
+        <div dangerouslySetInnerHTML={{ __html: quoteData.content }} />
+      )}
       {quoteData.quoteUrl && (
         <QuoteObject quoteUrl={quoteData.quoteUrl} depth={depth + 1} maxDepth={maxDepth} />
       )}
@@ -311,8 +318,11 @@ function App() {
   const parseAttributedTo = () => {
     // If we have actorInfo from webfinger, use it (preferred)
     if (actorInfo && (actorInfo.handle || actorInfo.nickname)) {
+      const handle = actorInfo.handle || '';
+      const domain = actorInfo.domain || '';
+      const fullHandle = handle && domain ? `@${handle}@${domain}` : handle ? `@${handle}` : '';
       return {
-        handle: actorInfo.handle || '',
+        handle: fullHandle,
         nickname: actorInfo.nickname || null,
         fallback: null
       };
@@ -332,7 +342,18 @@ function App() {
       const handle = previewData.attributedTo.preferredUsername || '';
       const nickname = previewData.attributedTo.name || null;
       const fallback = previewData.attributedTo.id || JSON.stringify(previewData.attributedTo);
-      return { handle, nickname, fallback };
+      // Try to extract domain from id URL
+      let domain = '';
+      if (previewData.attributedTo.id) {
+        try {
+          const url = new URL(previewData.attributedTo.id);
+          domain = url.hostname;
+        } catch (e) {
+          // Invalid URL, ignore
+        }
+      }
+      const fullHandle = handle && domain ? `@${handle}@${domain}` : handle ? `@${handle}` : '';
+      return { handle: fullHandle, nickname, fallback };
     }
 
     return { handle: null, nickname: null, fallback: null };
@@ -371,50 +392,40 @@ function App() {
           <section className="preview-section">
             <h2>Preview</h2>
             {previewData && (
-              <div className="activitypub-info">
-                <h3>ActivityPub Object</h3>
-                <div className="info-grid">
-                  {previewData.type && (
-                    <div className="info-item">
-                      <strong>Type:</strong> <span className="type-badge">{previewData.type}</span>
-                    </div>
-                  )}
-                  {previewData.id && (
-                    <div className="info-item">
-                      <strong>ID:</strong> <a href={previewData.id} target="_blank" rel="noopener noreferrer">{previewData.id}</a>
-                    </div>
-                  )}
-                  {previewData.published && (
-                    <div className="info-item">
-                      <strong>Published:</strong> {new Date(previewData.published).toISOString()}
-                    </div>
-                  )}
-                  {previewData.attributedTo && (() => {
-                    const { handle, nickname, fallback } = parseAttributedTo();
-                    return (
-                      <div className="info-item">
-                        <strong>Attributed To:</strong>{' '}
-                        {nickname && <span className="nickname">{nickname}</span>}
-                        {nickname && handle && ' '}
-                        {handle && <span className="handle">@{handle}</span>}
-                        {!handle && !nickname && fallback && <span>{fallback}</span>}
-                      </div>
-                    );
-                  })()}
-                  {previewData.content && (
-                    <div className="info-item full-width">
-                      <strong>Content:</strong>
-                      <div className="content-html" dangerouslySetInnerHTML={{ __html: previewData.content }} />
-                    </div>
-                  )}
-                  {previewData.quoteUrl && (
-                    <div className="info-item full-width">
-                      <strong>Quote:</strong>
+              <>
+                {previewData.content && (
+                  <div className="content-html">
+                    {(previewData.published || previewData.attributedTo) && (() => {
+                      const { handle, nickname, fallback } = parseAttributedTo();
+                      return (
+                        <div style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
+                          {previewData.attributedTo && (
+                            <>
+                              {nickname && <span className="nickname">{nickname}</span>}
+                              {nickname && handle && ' '}
+                              {handle && <span className="handle">{handle}</span>}
+                              {!handle && !nickname && fallback && <span>{fallback}</span>}
+                            </>
+                          )}
+                          {previewData.published && previewData.attributedTo && ' • '}
+                          {previewData.published && (
+                            <span>{new Date(previewData.published).toISOString()}</span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    <div dangerouslySetInnerHTML={{ __html: previewData.content }} />
+                    {previewData.quoteUrl && (
                       <QuoteObject quoteUrl={previewData.quoteUrl} depth={0} maxDepth={3} />
-                    </div>
-                  )}
-                </div>
-              </div>
+                    )}
+                  </div>
+                )}
+                {!previewData.content && previewData.quoteUrl && (
+                  <div className="content-html">
+                    <QuoteObject quoteUrl={previewData.quoteUrl} depth={0} maxDepth={3} />
+                  </div>
+                )}
+              </>
             )}
             <div className="preview-content">
               <pre>{preview}</pre>
