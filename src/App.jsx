@@ -430,16 +430,14 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
                       👁️
                     </div>
                   )}
-                  {!isMediaShown && (
-                    <div
-                      onClick={() => setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: true })}
-                      className="sensitive-media-overlay"
-                    >
-                      <span className="sensitive-media-overlay-text">
-                        press to show
-                      </span>
-                    </div>
-                  )}
+                  <div
+                    onClick={() => !isMediaShown && setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: true })}
+                    className={`sensitive-media-overlay ${isMediaShown ? 'hidden' : ''}`}
+                  >
+                    <span className="sensitive-media-overlay-text">
+                      press to show
+                    </span>
+                  </div>
                 </div>
               );
             }
@@ -863,16 +861,14 @@ function App() {
                                       👁️
                                     </div>
                                   )}
-                                  {!isMediaShown && (
-                                    <div
-                                      onClick={() => setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: true })}
-                                      className="sensitive-media-overlay"
-                                    >
-                                      <span className="sensitive-media-overlay-text">
-                                        press to show
-                                      </span>
-                                    </div>
-                                  )}
+                                  <div
+                                    onClick={() => !isMediaShown && setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: true })}
+                                    className={`sensitive-media-overlay ${isMediaShown ? 'hidden' : ''}`}
+                                  >
+                                    <span className="sensitive-media-overlay-text">
+                                      press to show
+                                    </span>
+                                  </div>
                                 </div>
                               );
                             }

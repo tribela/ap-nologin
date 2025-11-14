@@ -437,6 +437,10 @@ section {
   position: relative;
   display: inline-block;
   max-width: 100%;
+  overflow: hidden;
+  border-radius: 4px;
+  isolation: isolate;
+  line-height: 0;
 }
 
 .sensitive-media-wrapper {
@@ -445,6 +449,16 @@ section {
   user-select: none;
   display: inline-block;
   max-width: 100%;
+  overflow: hidden;
+  border-radius: 4px;
+  line-height: 0;
+}
+
+.sensitive-media-wrapper img,
+.sensitive-media-wrapper video {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }
 
 .sensitive-media-wrapper.shown {
@@ -489,6 +503,14 @@ section {
   border-radius: 4px;
   cursor: pointer;
   user-select: none;
+  opacity: 1;
+  transition: opacity 0.5s ease, background-color 0.3s ease;
+  pointer-events: auto;
+}
+
+.sensitive-media-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .sensitive-media-overlay:hover {
