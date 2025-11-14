@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 import httpx
 from asgiref.wsgi import WsgiToAsgi
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, Response
 from flask_cors import CORS
 
 app = Flask(__name__, static_folder='dist', static_url_path='')
@@ -462,27 +462,33 @@ def proxy_media():
         except Exception:
             return jsonify({"error": "Invalid URL format"}), 400
 
-        with httpx.Client(timeout=30.0, follow_redirects=True) as client:
-            response = client.get(media_url)
-            response.raise_for_status()
+        # Use streaming to avoid loading entire file into memory
+        with httpx.Client(timeout=15.0, follow_redirects=True, max_redirects=5) as client:
+            with client.stream('GET', media_url) as response:
+                response.raise_for_status()
 
-            # Validate content type - only allow media types
-            content_type = response.headers.get("content-type", "").lower()
-            allowed_types = (
-                "image/", "video/", "audio/",
-                "application/octet-stream"  # Some servers don't set proper content-type
-            )
-            if not any(content_type.startswith(t) for t in allowed_types):
-                # Still allow if content-type is missing (some servers don't set it)
-                if content_type:
-                    return jsonify({"error": "Invalid content type"}), 400
+                # Validate content type - only allow media types
+                content_type = response.headers.get("content-type", "").lower()
+                allowed_types = (
+                    "image/", "video/", "audio/",
+                    "application/octet-stream"  # Some servers don't set proper content-type
+                )
+                if not any(content_type.startswith(t) for t in allowed_types):
+                    # Still allow if content-type is missing (some servers don't set it)
+                    if content_type:
+                        return jsonify({"error": "Invalid content type"}), 400
 
-            # Return the media with appropriate content type and cache headers
-            headers = {
-                "Content-Type": content_type or "application/octet-stream",
-                "Cache-Control": "public, max-age=3600"  # Cache for 1 hour
-            }
-            return response.content, 200, headers
+                # Stream the response in chunks for better performance
+                def generate():
+                    for chunk in response.iter_bytes(chunk_size=8192):
+                        yield chunk
+
+                # Return the media with appropriate content type and cache headers
+                headers = {
+                    "Content-Type": content_type or "application/octet-stream",
+                    "Cache-Control": "public, max-age=3600"  # Cache for 1 hour
+                }
+                return Response(generate(), headers=headers, status_code=200)
 
     except httpx.HTTPError as e:
         return jsonify({"error": f"Failed to fetch media: {str(e)}"}), 500
