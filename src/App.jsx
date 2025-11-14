@@ -416,53 +416,25 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
               const mediaKey = `sensitive-${idx}`;
               const isMediaShown = showSensitiveMedia[mediaKey] || false;
               return (
-                <div key={idx} style={{ position: 'relative', display: 'block', width: '100%', maxWidth: '100%' }}>
-                  <div style={{
-                    filter: isMediaShown ? 'none' : 'blur(10px)',
-                    transition: 'filter 0.3s ease',
-                    pointerEvents: isMediaShown ? 'auto' : 'none',
-                    userSelect: 'none',
-                    width: '100%',
-                    maxWidth: '100%'
-                  }}>
+                <div key={idx} className="sensitive-media-container">
+                  <div className={`sensitive-media-wrapper ${isMediaShown ? 'shown' : ''}`}>
                     {mediaElement}
                   </div>
+                  {isMediaShown && (
+                    <div
+                      onClick={() => setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: false })}
+                      className="sensitive-media-hide-button"
+                      title="Hide sensitive content"
+                    >
+                      👁️
+                    </div>
+                  )}
                   {!isMediaShown && (
                     <div
                       onClick={() => setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: true })}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 10,
-                        backgroundColor: 'rgba(0, 0, 0, 0.1)',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        userSelect: 'none'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
-                      }}
+                      className="sensitive-media-overlay"
                     >
-                      <span
-                        style={{
-                          fontSize: '1.2rem',
-                          fontWeight: '500',
-                          color: '#fff',
-                          textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
-                          pointerEvents: 'none'
-                        }}
-                      >
+                      <span className="sensitive-media-overlay-text">
                         press to show
                       </span>
                     </div>
@@ -876,53 +848,25 @@ function App() {
                               const mediaKey = `sensitive-${idx}`;
                               const isMediaShown = showSensitiveMedia[mediaKey] || false;
                               return (
-                                <div key={idx} style={{ position: 'relative', display: 'block', width: '100%', maxWidth: '100%' }}>
-                                  <div style={{
-                                    filter: isMediaShown ? 'none' : 'blur(10px)',
-                                    transition: 'filter 0.3s ease',
-                                    pointerEvents: isMediaShown ? 'auto' : 'none',
-                                    userSelect: 'none',
-                                    width: '100%',
-                                    maxWidth: '100%'
-                                  }}>
+                                <div key={idx} className="sensitive-media-container">
+                                  <div className={`sensitive-media-wrapper ${isMediaShown ? 'shown' : ''}`}>
                                     {mediaElement}
                                   </div>
+                                  {isMediaShown && (
+                                    <div
+                                      onClick={() => setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: false })}
+                                      className="sensitive-media-hide-button"
+                                      title="Hide sensitive content"
+                                    >
+                                      👁️
+                                    </div>
+                                  )}
                                   {!isMediaShown && (
                                     <div
                                       onClick={() => setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: true })}
-                                      style={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        left: 0,
-                                        right: 0,
-                                        bottom: 0,
-                                        width: '100%',
-                                        height: '100%',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        zIndex: 10,
-                                        backgroundColor: 'rgba(0, 0, 0, 0.1)',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        userSelect: 'none'
-                                      }}
-                                      onMouseEnter={(e) => {
-                                        e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
-                                      }}
-                                      onMouseLeave={(e) => {
-                                        e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
-                                      }}
+                                      className="sensitive-media-overlay"
                                     >
-                                      <span
-                                        style={{
-                                          fontSize: '1.2rem',
-                                          fontWeight: '500',
-                                          color: '#fff',
-                                          textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
-                                          pointerEvents: 'none'
-                                        }}
-                                      >
+                                      <span className="sensitive-media-overlay-text">
                                         press to show
                                       </span>
                                     </div>
