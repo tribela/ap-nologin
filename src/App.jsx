@@ -112,6 +112,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
   const [loading, setLoading] = useState(false);
   const [errorStatus, setErrorStatus] = useState(null);
   const [showContent, setShowContent] = useState(false);
+  const [fullscreenMedia, setFullscreenMedia] = useState(null);
 
   useEffect(() => {
     if (!quoteUrl || depth >= maxDepth) {
@@ -304,6 +305,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
   const shouldShowContent = !hasCW || showContent;
 
   return (
+    <>
     <div className="content-html" style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
       {(quoteData.published || quoteData.attributedTo) && (
         <UserHeader
@@ -339,10 +341,106 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
       {shouldShowContent && quoteData.content && (
         <div dangerouslySetInnerHTML={{ __html: quoteData.content }} />
       )}
+      {shouldShowContent && quoteData.attachment && Array.isArray(quoteData.attachment) && quoteData.attachment.length > 0 && (
+        <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          {quoteData.attachment.map((att, idx) => {
+            const url = att.url || (typeof att === 'string' ? att : null);
+            const mediaType = att.mediaType || att.type || '';
+            const name = att.name || att.summary || '';
+            
+            if (!url) return null;
+            
+            if (mediaType.startsWith('image/')) {
+              return (
+                <img
+                  key={idx}
+                  src={url}
+                  alt={name}
+                  onClick={() => setFullscreenMedia({ type: 'image', url, name })}
+                  style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain', cursor: 'pointer' }}
+                />
+              );
+            } else if (mediaType.startsWith('video/')) {
+              return (
+                <video
+                  key={idx}
+                  src={url}
+                  controls
+                  onClick={() => setFullscreenMedia({ type: 'video', url, name })}
+                  style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  {name && <track kind="captions" />}
+                </video>
+              );
+            } else if (mediaType.startsWith('audio/')) {
+              return (
+                <audio
+                  key={idx}
+                  src={url}
+                  controls
+                  style={{ width: '100%', maxWidth: '500px' }}
+                >
+                  {name || 'Audio playback not supported'}
+                </audio>
+              );
+            } else {
+              return (
+                <a
+                  key={idx}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ display: 'block', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', textDecoration: 'none', color: '#0066cc' }}
+                >
+                  {name || url}
+                </a>
+              );
+            }
+          })}
+        </div>
+      )}
       {shouldShowContent && quoteData.quoteUrl && (
         <QuoteObject quoteUrl={quoteData.quoteUrl} depth={depth + 1} maxDepth={maxDepth} />
       )}
     </div>
+    {fullscreenMedia && (
+      <div
+        onClick={() => setFullscreenMedia(null)}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          cursor: 'pointer'
+        }}
+      >
+        {fullscreenMedia.type === 'image' ? (
+          <img
+            src={fullscreenMedia.url}
+            alt={fullscreenMedia.name || ''}
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain' }}
+          />
+        ) : (
+          <video
+            src={fullscreenMedia.url}
+            controls
+            autoPlay
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+          >
+            {fullscreenMedia.name && <track kind="captions" />}
+          </video>
+        )}
+      </div>
+    )}
+    </>
   );
 }
 
@@ -355,6 +453,7 @@ function App() {
   const [error, setError] = useState('');
   const [showRawJson, setShowRawJson] = useState(false);
   const [showContent, setShowContent] = useState(false);
+  const [fullscreenMedia, setFullscreenMedia] = useState(null);
 
   const handleRun = async () => {
     if (!url.trim()) {
@@ -414,6 +513,16 @@ function App() {
       handleRun();
     }
   };
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && fullscreenMedia) {
+        setFullscreenMedia(null);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [fullscreenMedia]);
 
   useEffect(() => {
     const fetchActorInfo = async () => {
@@ -586,6 +695,64 @@ function App() {
                     {(!previewData.summary || showContent) && previewData.content && (
                       <div dangerouslySetInnerHTML={{ __html: previewData.content }} />
                     )}
+                    {(!previewData.summary || showContent) && previewData.attachment && Array.isArray(previewData.attachment) && previewData.attachment.length > 0 && (
+                      <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        {previewData.attachment.map((att, idx) => {
+                          const url = att.url || (typeof att === 'string' ? att : null);
+                          const mediaType = att.mediaType || att.type || '';
+                          const name = att.name || att.summary || '';
+                          
+                          if (!url) return null;
+                          
+                          if (mediaType.startsWith('image/')) {
+                            return (
+                              <img
+                                key={idx}
+                                src={url}
+                                alt={name}
+                                onClick={() => setFullscreenMedia({ type: 'image', url, name })}
+                                style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain', cursor: 'pointer' }}
+                              />
+                            );
+                          } else if (mediaType.startsWith('video/')) {
+                            return (
+                              <video
+                                key={idx}
+                                src={url}
+                                controls
+                                onClick={() => setFullscreenMedia({ type: 'video', url, name })}
+                                style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', cursor: 'pointer' }}
+                              >
+                                {name && <track kind="captions" />}
+                              </video>
+                            );
+                          } else if (mediaType.startsWith('audio/')) {
+                            return (
+                              <audio
+                                key={idx}
+                                src={url}
+                                controls
+                                style={{ width: '100%', maxWidth: '500px' }}
+                              >
+                                {name || 'Audio playback not supported'}
+                              </audio>
+                            );
+                          } else {
+                            return (
+                              <a
+                                key={idx}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ display: 'block', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', textDecoration: 'none', color: '#0066cc' }}
+                              >
+                                {name || url}
+                              </a>
+                            );
+                          }
+                        })}
+                      </div>
+                    )}
                     {(!previewData.summary || showContent) && previewData.quoteUrl && (
                       <QuoteObject quoteUrl={previewData.quoteUrl} depth={0} maxDepth={3} />
                     )}
@@ -642,6 +809,43 @@ function App() {
           </section>
         )}
       </main>
+      {fullscreenMedia && (
+        <div
+          onClick={() => setFullscreenMedia(null)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            cursor: 'pointer'
+          }}
+        >
+          {fullscreenMedia.type === 'image' ? (
+            <img
+              src={fullscreenMedia.url}
+              alt={fullscreenMedia.name || ''}
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain' }}
+            />
+          ) : (
+            <video
+              src={fullscreenMedia.url}
+              controls
+              autoPlay
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: '90vw', maxHeight: '90vh' }}
+            >
+              {fullscreenMedia.name && <track kind="captions" />}
+            </video>
+          )}
+        </div>
+      )}
     </div>
   );
 }
