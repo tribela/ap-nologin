@@ -111,6 +111,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
   const [quoteActorInfo, setQuoteActorInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorStatus, setErrorStatus] = useState(null);
+  const [showContent, setShowContent] = useState(false);
 
   useEffect(() => {
     if (!quoteUrl || depth >= maxDepth) {
@@ -299,6 +300,9 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
 
   const { handle, nickname, fallback, tags, actorId, icon } = parseAttributedTo(quoteData, quoteActorInfo);
 
+  const hasCW = !!quoteData.summary;
+  const shouldShowContent = !hasCW || showContent;
+
   return (
     <div className="content-html" style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
       {(quoteData.published || quoteData.attributedTo) && (
@@ -313,10 +317,29 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
           postId={quoteData.id}
         />
       )}
-      {quoteData.content && (
+      {quoteData.summary && (
+        <div style={{ marginBottom: '0.5rem', padding: '0.5rem', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', fontSize: '0.9rem' }}>
+          <strong>Content Warning:</strong> {quoteData.summary}
+          <button
+            onClick={() => setShowContent(!showContent)}
+            style={{
+              marginLeft: '0.5rem',
+              padding: '0.25rem 0.5rem',
+              backgroundColor: '#fff',
+              border: '1px solid #ffc107',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '0.85rem'
+            }}
+          >
+            {showContent ? 'Hide' : 'Show'}
+          </button>
+        </div>
+      )}
+      {shouldShowContent && quoteData.content && (
         <div dangerouslySetInnerHTML={{ __html: quoteData.content }} />
       )}
-      {quoteData.quoteUrl && (
+      {shouldShowContent && quoteData.quoteUrl && (
         <QuoteObject quoteUrl={quoteData.quoteUrl} depth={depth + 1} maxDepth={maxDepth} />
       )}
     </div>
@@ -331,6 +354,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showRawJson, setShowRawJson] = useState(false);
+  const [showContent, setShowContent] = useState(false);
 
   const handleRun = async () => {
     if (!url.trim()) {
@@ -540,15 +564,57 @@ function App() {
                         />
                       );
                     })()}
-                    <div dangerouslySetInnerHTML={{ __html: previewData.content }} />
-                    {previewData.quoteUrl && (
+                    {previewData.summary && (
+                      <div style={{ marginBottom: '0.5rem', padding: '0.5rem', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', fontSize: '0.9rem' }}>
+                        <strong>Content Warning:</strong> {previewData.summary}
+                        <button
+                          onClick={() => setShowContent(!showContent)}
+                          style={{
+                            marginLeft: '0.5rem',
+                            padding: '0.25rem 0.5rem',
+                            backgroundColor: '#fff',
+                            border: '1px solid #ffc107',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem'
+                          }}
+                        >
+                          {showContent ? 'Hide' : 'Show'}
+                        </button>
+                      </div>
+                    )}
+                    {(!previewData.summary || showContent) && previewData.content && (
+                      <div dangerouslySetInnerHTML={{ __html: previewData.content }} />
+                    )}
+                    {(!previewData.summary || showContent) && previewData.quoteUrl && (
                       <QuoteObject quoteUrl={previewData.quoteUrl} depth={0} maxDepth={3} />
                     )}
                   </div>
                 )}
                 {!previewData.content && previewData.quoteUrl && (
                   <div className="content-html">
-                    <QuoteObject quoteUrl={previewData.quoteUrl} depth={0} maxDepth={3} />
+                    {previewData.summary && (
+                      <div style={{ marginBottom: '0.5rem', padding: '0.5rem', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', fontSize: '0.9rem' }}>
+                        <strong>Content Warning:</strong> {previewData.summary}
+                        <button
+                          onClick={() => setShowContent(!showContent)}
+                          style={{
+                            marginLeft: '0.5rem',
+                            padding: '0.25rem 0.5rem',
+                            backgroundColor: '#fff',
+                            border: '1px solid #ffc107',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem'
+                          }}
+                        >
+                          {showContent ? 'Hide' : 'Show'}
+                        </button>
+                      </div>
+                    )}
+                    {(!previewData.summary || showContent) && (
+                      <QuoteObject quoteUrl={previewData.quoteUrl} depth={0} maxDepth={3} />
+                    )}
                   </div>
                 )}
               </>
