@@ -1,195 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import './App.scss';
-import { getMediaUrl, renderHtmlWithEmojis, renderNicknameWithEmojis } from './utils/emojiUtils';
+import { getMediaUrl } from './utils/emojiUtils';
+import { getQuoteUrl, getContent } from './utils/activityPubHelpers';
 import SearchIcon from './icons/SearchIcon.svg?react';
 import LoadingIcon from './icons/LoadingIcon.svg?react';
-import RadioIcon from './icons/RadioIcon.svg?react';
-import CheckboxIcon from './icons/CheckboxIcon.svg?react';
-
-// Helper function to extract quote URL from various field names
-function getQuoteUrl(data) {
-  if (!data || typeof data !== 'object') return null;
-  // Try multiple possible field names
-  return data.quoteUrl || data.quote || data.quoteUri || data._misskey_quote || null;
-}
-
-// Helper function to extract content from various field names (including Misskey)
-function getContent(data) {
-  if (!data || typeof data !== 'object') return null;
-  // Try content, _misskey_content, or source.content
-  const content = data.content || data._misskey_content || (data.source && data.source.content) || null;
-  // Return content if it's a non-empty string
-  return (typeof content === 'string' && content.trim()) ? content : null;
-}
-
-// Helper function to format date as YYYY-mm-DD HH:MM:SS
-function formatDate(dateString) {
-  if (!dateString) return null;
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString; // Invalid date, return original
-
-    // Format: YYYY-mm-DD HH:MM:SS
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-
-    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-  } catch (e) {
-    return dateString; // Return original if formatting fails
-  }
-}
-
-// Helper function to extract poll data from ActivityPub object
-function getPollData(data) {
-  if (!data || typeof data !== 'object') return null;
-  // Check for oneOf or anyOf (poll options)
-  const pollOptions = data.oneOf || data.anyOf || null;
-  if (!pollOptions || !Array.isArray(pollOptions) || pollOptions.length === 0) return null;
-  
-  // Determine which field was used
-  const pollType = data.oneOf ? 'oneOf' : (data.anyOf ? 'anyOf' : null);
-  
-  return {
-    options: pollOptions,
-    closed: data.closed || false,
-    endTime: data.endTime || null,
-    voterCount: data.votersCount || null,
-    pollType: pollType
-  };
-}
-
-// Poll component for rendering poll data
-function Poll({ pollData }) {
-  if (!pollData || !pollData.options || !Array.isArray(pollData.options)) {
-    return null;
-  }
-
-  // Calculate total votes
-  const totalVotes = pollData.options.reduce((sum, option) => {
-    const votes = typeof option.replies === 'object' && option.replies !== null
-      ? (option.replies.totalItems || option.replies || 0)
-      : (option.replies || 0);
-    return sum + (typeof votes === 'number' ? votes : 0);
-  }, 0);
-
-  // Check if poll is closed
-  const isClosed = pollData.closed || (pollData.endTime && new Date(pollData.endTime) < new Date());
-
-  return (
-    <div className="poll-container">
-      <div className="poll-header">
-        <strong>Poll</strong>
-        {pollData.pollType && (
-          <span className="poll-type" title={pollData.pollType}>
-            {pollData.pollType === 'oneOf' ? (
-              <RadioIcon className="poll-type-icon" />
-            ) : (
-              <CheckboxIcon className="poll-type-icon" />
-            )}
-          </span>
-        )}
-        {pollData.endTime && (
-          <span className="poll-end-time">
-            {isClosed ? 'Closed' : `Ends: ${formatDate(pollData.endTime)}`}
-          </span>
-        )}
-        {pollData.voterCount !== null && (
-          <span className="poll-voter-count">
-            {pollData.voterCount} {pollData.voterCount === 1 ? 'vote' : 'votes'}
-          </span>
-        )}
-      </div>
-      <div className="poll-options">
-        {pollData.options.map((option, idx) => {
-          const votes = typeof option.replies === 'object' && option.replies !== null
-            ? (option.replies.totalItems || option.replies || 0)
-            : (option.replies || 0);
-          const voteCount = typeof votes === 'number' ? votes : 0;
-          const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
-          const optionName = option.name || option.content || `Option ${idx + 1}`;
-
-          return (
-            <div key={idx} className="poll-option">
-              <div className="poll-option-header">
-                <span className="poll-option-name">{optionName}</span>
-                <span className="poll-option-stats">
-                  {voteCount} ({percentage}%)
-                </span>
-              </div>
-              <div className="poll-option-bar-container">
-                <div 
-                  className="poll-option-bar" 
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {totalVotes > 0 && (
-        <div className="poll-footer">
-          <span className="poll-total-votes">{totalVotes} total {totalVotes === 1 ? 'vote' : 'votes'}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// UserHeader component for rendering user info (profile pic, nickname, handle, timestamp)
-function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published, postId, signedMedia = {} }) {
-  const iconSignature = icon ? (signedMedia[icon] || null) : null;
-  return (
-    <div className="user-header">
-      <div className="user-header-content">
-        {icon && (
-          <img
-            src={getMediaUrl(icon, iconSignature)}
-            alt="Profile"
-            className="user-header-avatar"
-            width="40"
-            height="40"
-          />
-        )}
-        <div className="user-header-info">
-          <div style={{ fontSize: '0.9rem', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-            {renderNicknameWithEmojis(nickname, tags, signedMedia)}
-          </div>
-          {handle && (
-            <div style={{ fontSize: '0.85rem', opacity: 0.7, wordBreak: 'break-word' }}>
-              {actorId ? (
-                <a href={actorId} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
-                <span className="handle">{handle}</span>
-              </a>
-              ) : (
-                <span className="handle">{handle}</span>
-              )}
-            </div>
-          )}
-          {!handle && !nickname && fallback && (
-            <div style={{ fontSize: '0.85rem', opacity: 0.7, wordBreak: 'break-word' }}>
-              <span>{fallback}</span>
-            </div>
-          )}
-        </div>
-      </div>
-      {published && (
-        <div className="user-header-date">
-          {postId ? (
-            <a href={postId} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
-              {formatDate(published)}
-            </a>
-          ) : (
-            <span>{formatDate(published)}</span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+import ActivityObject from './components/ActivityObject';
 
 
 // QuoteObject component for recursive rendering
@@ -393,158 +208,24 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
     return null;
   }
 
-  const { handle, nickname, fallback, tags, actorId, icon, signedMedia: actorSignedMedia } = parseAttributedTo(quoteData, quoteActorInfo);
-
-  const hasCW = !!quoteData.summary;
-  const shouldShowContent = !hasCW || showContent;
-  // Merge signed media from top level and actor info
-  const signedMedia = { ...quoteSignedMedia, ...(actorSignedMedia || {}) };
-
   return (
     <>
-    <div className="content-html" style={{ marginTop: '1rem', padding: '1rem' }}>
-      {(quoteData.published || quoteData.attributedTo) && (
-        <UserHeader
-          nickname={nickname}
-          handle={handle}
-          fallback={fallback}
-          tags={tags}
-          actorId={actorId}
-          icon={icon}
-          published={quoteData.published}
-          postId={quoteData.id}
-          signedMedia={signedMedia}
-        />
+    <ActivityObject
+      data={quoteData}
+      signedMedia={quoteSignedMedia}
+      actorInfo={quoteActorInfo}
+      parseAttributedTo={parseAttributedTo}
+      fullscreenMedia={fullscreenMedia}
+      setFullscreenMedia={setFullscreenMedia}
+      showSensitiveMedia={showSensitiveMedia}
+      setShowSensitiveMedia={setShowSensitiveMedia}
+      depth={depth + 1}
+      maxDepth={maxDepth}
+      containerStyle={{ marginTop: '1rem', padding: '1rem' }}
+      renderQuote={(quoteUrl, quoteDepth, quoteMaxDepth) => (
+        <QuoteObject quoteUrl={quoteUrl} depth={quoteDepth} maxDepth={quoteMaxDepth} />
       )}
-      {quoteData.summary && (
-        <div className="content-warning">
-          <strong>Content Warning:</strong> {quoteData.summary}
-          <button
-            onClick={() => setShowContent(!showContent)}
-          >
-            {showContent ? 'Hide' : 'Show'}
-          </button>
-        </div>
-      )}
-      {shouldShowContent && getContent(quoteData) && (
-        <div className="content-body">{renderHtmlWithEmojis(getContent(quoteData), quoteData.tag || [], signedMedia)}</div>
-      )}
-      {quoteData.attachment && Array.isArray(quoteData.attachment) && quoteData.attachment.length > 0 && (
-        <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-          {quoteData.attachment.map((att, idx) => {
-            let url = null;
-            if (typeof att === 'string') {
-              url = att;
-            } else if (att && typeof att === 'object') {
-              // Handle nested URL structure
-              if (typeof att.url === 'string') {
-                url = att.url;
-              } else if (att.url && typeof att.url === 'object' && att.url.href) {
-                url = att.url.href;
-              } else if (att.href) {
-                url = att.href;
-              }
-            }
-            const mediaType = att.mediaType || (att && att.type) || '';
-            const name = (att && att.name) || (att && att.summary) || '';
-            const isSensitive = att && typeof att === 'object' && (att.sensitive === true || att.sensitive === 'true');
-
-            if (!url) return null;
-
-            // Skip sensitive attachments if content is hidden (only if there's a CW or if showContent is false)
-            if (isSensitive && !shouldShowContent) return null;
-
-            const signature = signedMedia[url] || null;
-            const mediaElement = (() => {
-              if (mediaType.startsWith('image/')) {
-                return (
-                  <img
-                    key={idx}
-                    src={getMediaUrl(url, signature)}
-                    alt={name}
-                    onClick={() => setFullscreenMedia({ type: 'image', url, name, signature })}
-                    style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain', cursor: 'pointer' }}
-                  />
-                );
-              } else if (mediaType.startsWith('video/')) {
-                return (
-                  <video
-                    key={idx}
-                    src={getMediaUrl(url, signature)}
-                    controls
-                    onClick={() => setFullscreenMedia({ type: 'video', url, name, signature })}
-                    style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', cursor: 'pointer' }}
-                  >
-                    {name && <track kind="captions" />}
-                  </video>
-                );
-              } else if (mediaType.startsWith('audio/')) {
-                return (
-                  <audio
-                    key={idx}
-                    src={getMediaUrl(url, signature)}
-                    controls
-                    style={{ width: '100%', maxWidth: '500px' }}
-                  >
-                    {name || 'Audio playback not supported'}
-                  </audio>
-                );
-              } else {
-                return (
-                  <a
-                    key={idx}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ display: 'block', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', textDecoration: 'none', color: '#0066cc' }}
-                  >
-                    {name || url}
-                  </a>
-                );
-              }
-            })();
-
-            if (isSensitive) {
-              const mediaKey = `sensitive-${idx}`;
-              const isMediaShown = showSensitiveMedia[mediaKey] || false;
-              return (
-                <div key={idx} className="sensitive-media-container">
-                  <div className={`sensitive-media-wrapper ${isMediaShown ? 'shown' : ''}`}>
-                    {mediaElement}
-                  </div>
-                  {isMediaShown && (
-                    <div
-                      onClick={() => setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: false })}
-                      className="sensitive-media-hide-button"
-                      title="Hide sensitive content"
-                    >
-                      👁️
-                    </div>
-                  )}
-                  <div
-                    onClick={() => !isMediaShown && setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: true })}
-                    className={`sensitive-media-overlay ${isMediaShown ? 'hidden' : ''}`}
-                  >
-                    <span className="sensitive-media-overlay-text">
-                      press to show
-                    </span>
-                  </div>
-                </div>
-              );
-            }
-
-            return mediaElement;
-          })}
-        </div>
-      )}
-      {shouldShowContent && (() => {
-        const pollData = getPollData(quoteData);
-        return pollData ? <Poll pollData={pollData} /> : null;
-      })()}
-      {shouldShowContent && getQuoteUrl(quoteData) && (
-        <QuoteObject quoteUrl={getQuoteUrl(quoteData)} depth={depth + 1} maxDepth={maxDepth} />
-      )}
-    </div>
+    />
     {fullscreenMedia && (
       <div
         onClick={() => setFullscreenMedia(null)}
@@ -827,177 +508,70 @@ function App() {
             {previewData && (
               <>
                 {(getContent(previewData) || (previewData.attachment && previewData.attachment.length > 0)) && (
-                  <div className="content-html">
-                    {(previewData.published || previewData.attributedTo) && (() => {
-                      const { handle, nickname, fallback, tags, actorId, icon, signedMedia: actorSignedMedia } = parseAttributedTo();
-                      // Merge signed media from top level and actor info
-                      const signedMedia = { ...previewSignedMedia, ...(actorSignedMedia || {}) };
-                      return (
-                        <UserHeader
-                          nickname={nickname}
-                          handle={handle}
-                          fallback={fallback}
-                          tags={tags}
-                          actorId={actorId}
-                          icon={icon}
-                          published={previewData.published}
-                          postId={previewData.id}
-                          signedMedia={signedMedia}
-                        />
-                      );
-                    })()}
-                    {previewData.summary && (
-                      <div className="content-warning">
-                        <strong>Content Warning:</strong> {previewData.summary}
-                        <button
-                          onClick={() => setShowContent(!showContent)}
-                        >
-                          {showContent ? 'Hide' : 'Show'}
-                        </button>
-                      </div>
+                  <ActivityObject
+                    data={previewData}
+                    signedMedia={previewSignedMedia}
+                    actorInfo={actorInfo}
+                    parseAttributedTo={(data, info) => {
+                      if (info && (info.handle || info.nickname)) {
+                        const handle = info.handle || '';
+                        const domain = info.domain || '';
+                        const fullHandle = handle && domain ? `@${handle}@${domain}` : handle ? `@${handle}` : '';
+                        return {
+                          handle: fullHandle,
+                          nickname: info.nickname || null,
+                          fallback: null,
+                          tags: info.tag || [],
+                          actorId: info.id || null,
+                          icon: info.icon || null,
+                          signedMedia: info._signed_media || {}
+                        };
+                      }
+                      return parseAttributedTo();
+                    }}
+                    fullscreenMedia={fullscreenMedia}
+                    setFullscreenMedia={setFullscreenMedia}
+                    showSensitiveMedia={showSensitiveMedia}
+                    setShowSensitiveMedia={setShowSensitiveMedia}
+                    depth={0}
+                    maxDepth={3}
+                    renderQuote={(quoteUrl, quoteDepth, quoteMaxDepth) => (
+                      <QuoteObject quoteUrl={quoteUrl} depth={quoteDepth} maxDepth={quoteMaxDepth} />
                     )}
-                    {(!previewData.summary || showContent) && getContent(previewData) && (
-                      <div className="content-body">{renderHtmlWithEmojis(getContent(previewData), previewData.tag || [], previewSignedMedia)}</div>
-                    )}
-                    {previewData.attachment && Array.isArray(previewData.attachment) && previewData.attachment.length > 0 && (() => {
-                      const shouldShowAttachments = !previewData.summary || showContent;
-                      return (
-                        <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                          {previewData.attachment.map((att, idx) => {
-                            let url = null;
-                            if (typeof att === 'string') {
-                              url = att;
-                            } else if (att && typeof att === 'object') {
-                              // Handle nested URL structure
-                              if (typeof att.url === 'string') {
-                                url = att.url;
-                              } else if (att.url && typeof att.url === 'object' && att.url.href) {
-                                url = att.url.href;
-                              } else if (att.href) {
-                                url = att.href;
-                              }
-                            }
-                            const mediaType = att.mediaType || (att && att.type) || '';
-                            const name = (att && att.name) || (att && att.summary) || '';
-                            const isSensitive = att && typeof att === 'object' && (att.sensitive === true || att.sensitive === 'true');
-                            if (!url) return null;
-
-                            // Skip sensitive attachments if content is hidden
-                            if (isSensitive && !shouldShowAttachments) return null;
-
-                            const signature = previewSignedMedia[url] || null;
-                            const mediaElement = (() => {
-                              if (mediaType.startsWith('image/')) {
-                                return (
-                                  <img
-                                    key={idx}
-                                    src={getMediaUrl(url, signature)}
-                                    alt={name}
-                                    onClick={() => setFullscreenMedia({ type: 'image', url, name, signature })}
-                                    style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain', cursor: 'pointer' }}
-                                  />
-                                );
-                              } else if (mediaType.startsWith('video/')) {
-                                return (
-                                  <video
-                                    key={idx}
-                                    src={getMediaUrl(url, signature)}
-                                    controls
-                                    onClick={() => setFullscreenMedia({ type: 'video', url, name, signature })}
-                                    style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', cursor: 'pointer' }}
-                                  >
-                                    {name && <track kind="captions" />}
-                                  </video>
-                                );
-                              } else if (mediaType.startsWith('audio/')) {
-                                return (
-                                  <audio
-                                    key={idx}
-                                    src={getMediaUrl(url, signature)}
-                                    controls
-                                    style={{ width: '100%', maxWidth: '500px' }}
-                                  >
-                                    {name || 'Audio playback not supported'}
-                                  </audio>
-                                );
-                              } else {
-                                return (
-                                  <a
-                                    key={idx}
-                                    href={url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{ display: 'block', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', textDecoration: 'none', color: '#0066cc' }}
-                                  >
-                                    {name || url}
-                                  </a>
-                                );
-                              }
-                            })();
-
-                            if (isSensitive) {
-                              const mediaKey = `sensitive-${idx}`;
-                              const isMediaShown = showSensitiveMedia[mediaKey] || false;
-                              return (
-                                <div key={idx} className="sensitive-media-container">
-                                  <div className={`sensitive-media-wrapper ${isMediaShown ? 'shown' : ''}`}>
-                                    {mediaElement}
-                                  </div>
-                                  {isMediaShown && (
-                                    <div
-                                      onClick={() => setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: false })}
-                                      className="sensitive-media-hide-button"
-                                      title="Hide sensitive content"
-                                    >
-                                      👁️
-                                    </div>
-                                  )}
-                                  <div
-                                    onClick={() => !isMediaShown && setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: true })}
-                                    className={`sensitive-media-overlay ${isMediaShown ? 'hidden' : ''}`}
-                                  >
-                                    <span className="sensitive-media-overlay-text">
-                                      press to show
-                                    </span>
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            return mediaElement;
-                          })}
-                        </div>
-                      );
-                    })()}
-                    {(!previewData.summary || showContent) && (() => {
-                      const pollData = getPollData(previewData);
-                      return pollData ? <Poll pollData={pollData} /> : null;
-                    })()}
-                    {(!previewData.summary || showContent) && getQuoteUrl(previewData) && (
-                      <QuoteObject quoteUrl={getQuoteUrl(previewData)} depth={0} maxDepth={3} />
-                    )}
-                  </div>
+                  />
                 )}
                 {!getContent(previewData) && getQuoteUrl(previewData) && (
-                  <div className="content-html">
-                    {previewData.summary && (
-                      <div className="content-warning">
-                        <strong>Content Warning:</strong> {previewData.summary}
-                        <button
-                          onClick={() => setShowContent(!showContent)}
-                        >
-                          {showContent ? 'Hide' : 'Show'}
-                        </button>
-                      </div>
+                  <ActivityObject
+                    data={previewData}
+                    signedMedia={previewSignedMedia}
+                    actorInfo={actorInfo}
+                    parseAttributedTo={(data, info) => {
+                      if (info && (info.handle || info.nickname)) {
+                        const handle = info.handle || '';
+                        const domain = info.domain || '';
+                        const fullHandle = handle && domain ? `@${handle}@${domain}` : handle ? `@${handle}` : '';
+                        return {
+                          handle: fullHandle,
+                          nickname: info.nickname || null,
+                          fallback: null,
+                          tags: info.tag || [],
+                          actorId: info.id || null,
+                          icon: info.icon || null,
+                          signedMedia: info._signed_media || {}
+                        };
+                      }
+                      return parseAttributedTo();
+                    }}
+                    fullscreenMedia={fullscreenMedia}
+                    setFullscreenMedia={setFullscreenMedia}
+                    showSensitiveMedia={showSensitiveMedia}
+                    setShowSensitiveMedia={setShowSensitiveMedia}
+                    depth={0}
+                    maxDepth={3}
+                    renderQuote={(quoteUrl, quoteDepth, quoteMaxDepth) => (
+                      <QuoteObject quoteUrl={quoteUrl} depth={quoteDepth} maxDepth={quoteMaxDepth} />
                     )}
-                    {(!previewData.summary || showContent) && (() => {
-                      const pollData = getPollData(previewData);
-                      return pollData ? <Poll pollData={pollData} /> : null;
-                    })()}
-                    {(!previewData.summary || showContent) && (
-                      <QuoteObject quoteUrl={getQuoteUrl(previewData)} depth={0} maxDepth={3} />
-                    )}
-                  </div>
+                  />
                 )}
               </>
             )}
