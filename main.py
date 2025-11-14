@@ -6,6 +6,7 @@ import os
 from urllib.parse import urlparse
 
 import httpx
+from asgiref.wsgi import WsgiToAsgi
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -374,7 +375,8 @@ def serve(path):
 def main():
     print("Starting Flask server...")
     print(f"Serving React app from: {app.static_folder}")
-    app.run(debug=True, use_reloader=True, host="0.0.0.0", port=5000)
+    debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(debug=debug, use_reloader=debug, host="0.0.0.0", port=5000)
 
 
 @app.route("/api/media", methods=["GET"])
@@ -444,6 +446,10 @@ def proxy_media():
         return jsonify({"error": f"Failed to fetch media: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+# Wrap Flask app as ASGI for uvicorn
+asgi_app = WsgiToAsgi(app)
 
 
 if __name__ == "__main__":
