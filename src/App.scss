@@ -551,5 +551,9 @@ section {
   height: 1em;
   vertical-align: middle;
   margin: 0 0.1em;
+
+  .content-body & {
+    height: 2em;
+  }
 }
 

@@ -336,7 +336,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
         </div>
       )}
       {shouldShowContent && getContent(quoteData) && (
-        <div>{renderHtmlWithEmojis(getContent(quoteData), quoteData.tag || [], signedMedia)}</div>
+        <div className="content-body">{renderHtmlWithEmojis(getContent(quoteData), quoteData.tag || [], signedMedia)}</div>
       )}
       {quoteData.attachment && Array.isArray(quoteData.attachment) && quoteData.attachment.length > 0 && (
         <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -766,7 +766,7 @@ function App() {
                       </div>
                     )}
                     {(!previewData.summary || showContent) && getContent(previewData) && (
-                      <div>{renderHtmlWithEmojis(getContent(previewData), previewData.tag || [], previewSignedMedia)}</div>
+                      <div className="content-body">{renderHtmlWithEmojis(getContent(previewData), previewData.tag || [], previewSignedMedia)}</div>
                     )}
                     {previewData.attachment && Array.isArray(previewData.attachment) && previewData.attachment.length > 0 && (() => {
                       const shouldShowAttachments = !previewData.summary || showContent;
