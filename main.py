@@ -1,3 +1,7 @@
+import base64
+import hashlib
+import hmac
+import ipaddress
 import os
 from urllib.parse import urlparse
 
@@ -7,6 +11,22 @@ from flask_cors import CORS
 
 app = Flask(__name__, static_folder='dist', static_url_path='')
 CORS(app)
+
+# HMAC secret key for signing media URLs
+# In production, use environment variable or secure key management
+MEDIA_HMAC_SECRET = os.environ.get('MEDIA_HMAC_SECRET', 'change-me-in-production').encode('utf-8')
+
+
+def sign_media_url(url):
+    """Generate HMAC signature for a media URL"""
+    signature = hmac.new(MEDIA_HMAC_SECRET, url.encode('utf-8'), hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(signature).decode('utf-8').rstrip('=')
+
+
+def verify_media_signature(url, signature):
+    """Verify HMAC signature for a media URL"""
+    expected_signature = sign_media_url(url)
+    return hmac.compare_digest(expected_signature, signature)
 
 
 # API routes
@@ -59,16 +79,65 @@ def process_url():
                 "application/activity+json" in content_type or
                 "application/json" in content_type
             )
+            signed_media = {}
             if is_json:
                 try:
                     content = response.json()
+                    # Add HMAC signatures for media URLs in ActivityPub objects
+                    if isinstance(content, dict):
+                        # Extract and sign icon URLs
+                        if 'attributedTo' in content and isinstance(content['attributedTo'], dict):
+                            icon = content['attributedTo'].get('icon')
+                            if icon:
+                                icon_url = icon.get('url') if isinstance(icon, dict) else icon
+                                if isinstance(icon_url, str) and icon_url.startswith(('http://', 'https://')):
+                                    signed_media[icon_url] = sign_media_url(icon_url)
+                            # Sign emoji URLs from attributedTo tags
+                            attributed_tags = content['attributedTo'].get('tag', [])
+                            if isinstance(attributed_tags, list):
+                                for tag in attributed_tags:
+                                    if isinstance(tag, dict) and tag.get('type') == 'Emoji':
+                                        emoji_icon = tag.get('icon')
+                                        if emoji_icon:
+                                            if isinstance(emoji_icon, dict):
+                                                emoji_url = emoji_icon.get('url')
+                                            else:
+                                                emoji_url = emoji_icon
+                                            if (isinstance(emoji_url, str) and
+                                                    emoji_url.startswith(('http://', 'https://'))):
+                                                signed_media[emoji_url] = sign_media_url(emoji_url)
+                        # Extract and sign attachment URLs
+                        if 'attachment' in content and isinstance(content['attachment'], list):
+                            for att in content['attachment']:
+                                att_url = None
+                                if isinstance(att, str):
+                                    att_url = att
+                                elif isinstance(att, dict):
+                                    att_url = att.get('url') or att.get('href')
+                                    if isinstance(att_url, dict):
+                                        att_url = att_url.get('href')
+                                if att_url and isinstance(att_url, str) and att_url.startswith(('http://', 'https://')):
+                                    signed_media[att_url] = sign_media_url(att_url)
+                        # Extract and sign emoji URLs from tags
+                        if 'tag' in content and isinstance(content['tag'], list):
+                            for tag in content['tag']:
+                                if isinstance(tag, dict) and tag.get('type') == 'Emoji':
+                                    emoji_icon = tag.get('icon')
+                                    if emoji_icon:
+                                        if isinstance(emoji_icon, dict):
+                                            emoji_url = emoji_icon.get('url')
+                                        else:
+                                            emoji_url = emoji_icon
+                                        if (isinstance(emoji_url, str) and
+                                                emoji_url.startswith(('http://', 'https://'))):
+                                            signed_media[emoji_url] = sign_media_url(emoji_url)
                 except Exception:
                     content = response.text
             else:
                 content = response.text
 
-            # Return the content
-            return jsonify({
+            # Return the content with signed_media at top level
+            result = {
                 "success": True,
                 "url": url,
                 "final_url": final_url,
@@ -76,7 +145,10 @@ def process_url():
                 "content": content,
                 "content_type": content_type,
                 "status_code": response.status_code
-            })
+            }
+            if signed_media:
+                result["_signed_media"] = signed_media
+            return jsonify(result)
     except httpx.HTTPStatusError as e:
         # Handle HTTP status errors that weren't caught above
         status_code = e.response.status_code
@@ -122,22 +194,43 @@ def webfinger():
                 # Extract domain from actor URL
                 parsed = urlparse(actor_url)
                 domain = parsed.netloc or ''
-                # Extract icon URL
+                # Extract icon URL and sign it
                 icon_url = None
                 icon = actor_data.get('icon')
                 if isinstance(icon, dict):
                     icon_url = icon.get('url')
                 elif isinstance(icon, str):
                     icon_url = icon
-                return jsonify({
+                # Sign icon URL if present
+                signed_media = {}
+                if icon_url and isinstance(icon_url, str) and icon_url.startswith(('http://', 'https://')):
+                    signed_media[icon_url] = sign_media_url(icon_url)
+                # Sign emoji URLs from tags
+                tags = actor_data.get('tag', [])
+                if isinstance(tags, list):
+                    for tag in tags:
+                        if isinstance(tag, dict) and tag.get('type') == 'Emoji':
+                            emoji_icon = tag.get('icon')
+                            if emoji_icon:
+                                if isinstance(emoji_icon, dict):
+                                    emoji_url = emoji_icon.get('url')
+                                else:
+                                    emoji_url = emoji_icon
+                                if (isinstance(emoji_url, str) and
+                                        emoji_url.startswith(('http://', 'https://'))):
+                                    signed_media[emoji_url] = sign_media_url(emoji_url)
+                result = {
                     "success": True,
                     "handle": actor_data.get('preferredUsername', ''),
                     "nickname": actor_data.get('name', ''),
                     "id": actor_data.get('id', actor_url),
                     "domain": domain,
-                    "tag": actor_data.get('tag', []),
+                    "tag": tags,
                     "icon": icon_url
-                })
+                }
+                if signed_media:
+                    result["_signed_media"] = signed_media
+                return jsonify(result)
 
             # Otherwise, try webfinger lookup
             if resource.startswith('acct:'):
@@ -177,22 +270,43 @@ def webfinger():
                 # Extract domain from actor URL
                 parsed = urlparse(actor_url)
                 domain = parsed.netloc or ''
-                # Extract icon URL
+                # Extract icon URL and sign it
                 icon_url = None
                 icon = actor_data.get('icon')
                 if isinstance(icon, dict):
                     icon_url = icon.get('url')
                 elif isinstance(icon, str):
                     icon_url = icon
-                return jsonify({
+                # Sign icon URL if present
+                signed_media = {}
+                if icon_url and isinstance(icon_url, str) and icon_url.startswith(('http://', 'https://')):
+                    signed_media[icon_url] = sign_media_url(icon_url)
+                # Sign emoji URLs from tags
+                tags = actor_data.get('tag', [])
+                if isinstance(tags, list):
+                    for tag in tags:
+                        if isinstance(tag, dict) and tag.get('type') == 'Emoji':
+                            emoji_icon = tag.get('icon')
+                            if emoji_icon:
+                                if isinstance(emoji_icon, dict):
+                                    emoji_url = emoji_icon.get('url')
+                                else:
+                                    emoji_url = emoji_icon
+                                if (isinstance(emoji_url, str) and
+                                        emoji_url.startswith(('http://', 'https://'))):
+                                    signed_media[emoji_url] = sign_media_url(emoji_url)
+                result = {
                     "success": True,
                     "handle": actor_data.get('preferredUsername', ''),
                     "nickname": actor_data.get('name', ''),
                     "id": actor_data.get('id', actor_url),
                     "domain": domain,
-                    "tag": actor_data.get('tag', []),
+                    "tag": tags,
                     "icon": icon_url
-                })
+                }
+                if signed_media:
+                    result["_signed_media"] = signed_media
+                return jsonify(result)
             except httpx.HTTPError:
                 # If webfinger fails, try to use resource as direct actor URL
                 if resource.startswith('http://') or resource.startswith('https://'):
@@ -202,23 +316,43 @@ def webfinger():
                     # Extract domain from resource URL
                     parsed = urlparse(resource)
                     domain = parsed.netloc or ''
-                    # Extract icon URL
+                    # Extract icon URL and sign it
                     icon_url = None
                     icon = actor_data.get('icon')
                     if isinstance(icon, dict):
                         icon_url = icon.get('url')
                     elif isinstance(icon, str):
                         icon_url = icon
-
-                    return jsonify({
+                    # Sign icon URL if present
+                    signed_media = {}
+                    if icon_url and isinstance(icon_url, str) and icon_url.startswith(('http://', 'https://')):
+                        signed_media[icon_url] = sign_media_url(icon_url)
+                    # Sign emoji URLs from tags
+                    tags = actor_data.get('tag', [])
+                    if isinstance(tags, list):
+                        for tag in tags:
+                            if isinstance(tag, dict) and tag.get('type') == 'Emoji':
+                                emoji_icon = tag.get('icon')
+                                if emoji_icon:
+                                    if isinstance(emoji_icon, dict):
+                                        emoji_url = emoji_icon.get('url')
+                                    else:
+                                        emoji_url = emoji_icon
+                                    if (isinstance(emoji_url, str) and
+                                            emoji_url.startswith(('http://', 'https://'))):
+                                        signed_media[emoji_url] = sign_media_url(emoji_url)
+                    result = {
                         "success": True,
                         "handle": actor_data.get('preferredUsername', ''),
                         "nickname": actor_data.get('name', ''),
                         "id": actor_data.get('id', resource),
                         "domain": domain,
-                        "tag": actor_data.get('tag', []),
+                        "tag": tags,
                         "icon": icon_url
-                    })
+                    }
+                    if signed_media:
+                        result["_signed_media"] = signed_media
+                    return jsonify(result)
                 raise
 
     except httpx.HTTPError as e:
@@ -250,17 +384,61 @@ def proxy_media():
         if not media_url:
             return jsonify({"error": "URL parameter is required"}), 400
 
-        headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; MSK-NoLogin/1.0)"
-        }
+        # Verify HMAC signature - signature is required for security
+        signature = request.args.get('sig', '')
+        if not signature:
+            return jsonify({"error": "Signature is required"}), 403
+
+        if not verify_media_signature(media_url, signature):
+            return jsonify({"error": "Invalid signature"}), 403
+
+        # Validate URL format
+        try:
+            parsed = urlparse(media_url)
+            # Only allow http and https protocols
+            if parsed.scheme not in ('http', 'https'):
+                return jsonify({"error": "Only HTTP and HTTPS URLs are allowed"}), 400
+            # Must have a valid hostname
+            if not parsed.netloc:
+                return jsonify({"error": "Invalid URL format"}), 400
+            # Prevent localhost/internal network access using ipaddress module
+            hostname = parsed.hostname.lower()
+            # Check if hostname is a blocked hostname
+            blocked_hostnames = ('localhost', '0.0.0.0')
+            if hostname in blocked_hostnames:
+                return jsonify({"error": "Local network access is not allowed"}), 403
+
+            # Try to parse as IP address
+            try:
+                ip = ipaddress.ip_address(hostname)
+                # Block private, loopback, link-local, and reserved addresses
+                if (ip.is_private or ip.is_loopback or ip.is_link_local or
+                        ip.is_reserved or ip.is_multicast):
+                    return jsonify({"error": "Local network access is not allowed"}), 403
+            except ValueError:
+                # Not an IP address, check if it's a blocked hostname
+                if hostname == 'localhost':
+                    return jsonify({"error": "Local network access is not allowed"}), 403
+        except Exception:
+            return jsonify({"error": "Invalid URL format"}), 400
 
         with httpx.Client(timeout=30.0, follow_redirects=True) as client:
-            response = client.get(media_url, headers=headers)
+            response = client.get(media_url)
             response.raise_for_status()
 
+            # Validate content type - only allow media types
+            content_type = response.headers.get("content-type", "").lower()
+            allowed_types = (
+                "image/", "video/", "audio/",
+                "application/octet-stream"  # Some servers don't set proper content-type
+            )
+            if not any(content_type.startswith(t) for t in allowed_types):
+                # Still allow if content-type is missing (some servers don't set it)
+                if content_type:
+                    return jsonify({"error": "Invalid content type"}), 400
+
             # Return the media with appropriate content type
-            content_type = response.headers.get("content-type", "application/octet-stream")
-            return response.content, 200, {"Content-Type": content_type}
+            return response.content, 200, {"Content-Type": content_type or "application/octet-stream"}
 
     except httpx.HTTPError as e:
         return jsonify({"error": f"Failed to fetch media: {str(e)}"}), 500

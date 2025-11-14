@@ -2,27 +2,33 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 
 // Helper function to proxy media URLs through backend
-function getMediaUrl(url) {
+// Note: HMAC signature should be generated server-side when processing ActivityPub objects
+function getMediaUrl(url, signature = null) {
   if (!url) return null;
   // If already a relative URL or data URL, return as is
   if (url.startsWith('/') || url.startsWith('data:')) {
     return url;
   }
   // Proxy through backend
-  return `/api/media?url=${encodeURIComponent(url)}`;
+  let proxyUrl = `/api/media?url=${encodeURIComponent(url)}`;
+  if (signature) {
+    proxyUrl += `&sig=${encodeURIComponent(signature)}`;
+  }
+  return proxyUrl;
 }
 
 // UserHeader component for rendering user info (profile pic, nickname, handle, timestamp)
-function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published, postId }) {
+function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published, postId, signedMedia = {} }) {
+  const iconSignature = icon ? (signedMedia[icon] || null) : null;
   return (
     <div style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem', justifyContent: 'space-between', alignItems: 'flex-start' }}>
       <div style={{ display: 'flex', gap: '0.5rem', flex: 1 }}>
         {icon && (
-          <img src={getMediaUrl(icon)} alt="Profile" style={{ width: '2.5em', height: '2.5em', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+          <img src={getMediaUrl(icon, iconSignature)} alt="Profile" style={{ width: '2.5em', height: '2.5em', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
         )}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: '0.9rem' }}>
-            {renderNicknameWithEmojis(nickname, tags)}
+            {renderNicknameWithEmojis(nickname, tags, signedMedia)}
           </div>
           {handle && (
             <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
@@ -58,7 +64,7 @@ function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published
 }
 
 // Function to render nickname with custom emojis
-function renderNicknameWithEmojis(nickname, tags = []) {
+function renderNicknameWithEmojis(nickname, tags = [], signedMedia = {}) {
   if (!nickname) {
     return null;
   }
@@ -92,10 +98,12 @@ function renderNicknameWithEmojis(nickname, tags = []) {
 
     const emojiName = `:${match[1]}:`;
     if (emojiMap[emojiName]) {
+      const emojiUrl = emojiMap[emojiName];
+      const emojiSignature = signedMedia[emojiUrl] || null;
       parts.push(
         <img
           key={match.index}
-          src={getMediaUrl(emojiMap[emojiName])}
+          src={getMediaUrl(emojiUrl, emojiSignature)}
           alt={emojiName}
           style={{ width: '1em', height: '1em', verticalAlign: 'middle', margin: '0 0.1em' }}
         />
@@ -119,6 +127,7 @@ function renderNicknameWithEmojis(nickname, tags = []) {
 // QuoteObject component for recursive rendering
 function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
   const [quoteData, setQuoteData] = useState(null);
+  const [quoteSignedMedia, setQuoteSignedMedia] = useState({});
   const [quoteActorInfo, setQuoteActorInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errorStatus, setErrorStatus] = useState(null);
@@ -156,6 +165,12 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
         const data = await response.json();
         if (response.ok && typeof data.content === 'object' && data.content !== null) {
           setQuoteData(data.content);
+          // Extract _signed_media from top level if present
+          if (data._signed_media) {
+            setQuoteSignedMedia(data._signed_media);
+          } else {
+            setQuoteSignedMedia({});
+          }
         }
       } catch (err) {
         console.error('Failed to fetch quote:', err);
@@ -222,7 +237,8 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
         fallback: null,
         tags: actorInfo.tag || [],
         actorId: actorInfo.id || null,
-        icon: actorInfo.icon || null
+        icon: actorInfo.icon || null,
+        signedMedia: actorInfo._signed_media || {}
       };
     }
 
@@ -310,10 +326,12 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
     return null;
   }
 
-  const { handle, nickname, fallback, tags, actorId, icon } = parseAttributedTo(quoteData, quoteActorInfo);
+  const { handle, nickname, fallback, tags, actorId, icon, signedMedia: actorSignedMedia } = parseAttributedTo(quoteData, quoteActorInfo);
 
   const hasCW = !!quoteData.summary;
   const shouldShowContent = !hasCW || showContent;
+  // Merge signed media from top level and actor info
+  const signedMedia = { ...quoteSignedMedia, ...(actorSignedMedia || {}) };
 
   return (
     <>
@@ -328,6 +346,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
           icon={icon}
           published={quoteData.published}
           postId={quoteData.id}
+          signedMedia={signedMedia}
         />
       )}
       {quoteData.summary && (
@@ -373,13 +392,14 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
             
             if (!url) return null;
             
+            const signature = signedMedia[url] || null;
             if (mediaType.startsWith('image/')) {
               return (
                 <img
                   key={idx}
-                  src={getMediaUrl(url)}
+                  src={getMediaUrl(url, signature)}
                   alt={name}
-                  onClick={() => setFullscreenMedia({ type: 'image', url, name })}
+                  onClick={() => setFullscreenMedia({ type: 'image', url, name, signature })}
                   style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain', cursor: 'pointer' }}
                 />
               );
@@ -387,9 +407,9 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
               return (
                 <video
                   key={idx}
-                  src={getMediaUrl(url)}
+                  src={getMediaUrl(url, signature)}
                   controls
-                  onClick={() => setFullscreenMedia({ type: 'video', url, name })}
+                  onClick={() => setFullscreenMedia({ type: 'video', url, name, signature })}
                   style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   {name && <track kind="captions" />}
@@ -399,7 +419,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
               return (
                 <audio
                   key={idx}
-                  src={getMediaUrl(url)}
+                  src={getMediaUrl(url, signature)}
                   controls
                   style={{ width: '100%', maxWidth: '500px' }}
                 >
@@ -445,14 +465,14 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
       >
         {fullscreenMedia.type === 'image' ? (
           <img
-            src={getMediaUrl(fullscreenMedia.url)}
+            src={getMediaUrl(fullscreenMedia.url, fullscreenMedia.signature || null)}
             alt={fullscreenMedia.name || ''}
             onClick={(e) => e.stopPropagation()}
             style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain' }}
           />
         ) : (
           <video
-            src={getMediaUrl(fullscreenMedia.url)}
+            src={getMediaUrl(fullscreenMedia.url, fullscreenMedia.signature || null)}
             controls
             autoPlay
             onClick={(e) => e.stopPropagation()}
@@ -471,6 +491,7 @@ function App() {
   const [url, setUrl] = useState('');
   const [preview, setPreview] = useState('');
   const [previewData, setPreviewData] = useState(null);
+  const [previewSignedMedia, setPreviewSignedMedia] = useState({});
   const [actorInfo, setActorInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -488,6 +509,7 @@ function App() {
     setError('');
     setPreview('');
     setPreviewData(null);
+    setPreviewSignedMedia({});
 
     try {
       const response = await fetch('/api/process', {
@@ -516,9 +538,16 @@ function App() {
 
       if (typeof content === 'object' && content !== null) {
         setPreviewData(content);
+        // Extract _signed_media from top level if present
+        if (data._signed_media) {
+          setPreviewSignedMedia(data._signed_media);
+        } else {
+          setPreviewSignedMedia({});
+        }
         displayPreview += JSON.stringify(content, null, 2);
       } else {
         displayPreview += content || 'No content received';
+        setPreviewSignedMedia({});
       }
 
       setPreview(displayPreview);
@@ -599,7 +628,8 @@ function App() {
         fallback: null,
         tags: actorInfo.tag || [],
         actorId: actorInfo.id || null,
-        icon: actorInfo.icon || null
+        icon: actorInfo.icon || null,
+        signedMedia: actorInfo._signed_media || {}
       };
     }
 
@@ -682,7 +712,9 @@ function App() {
                 {previewData.content && (
                   <div className="content-html">
                     {(previewData.published || previewData.attributedTo) && (() => {
-                      const { handle, nickname, fallback, tags, actorId, icon } = parseAttributedTo();
+                      const { handle, nickname, fallback, tags, actorId, icon, signedMedia: actorSignedMedia } = parseAttributedTo();
+                      // Merge signed media from top level and actor info
+                      const signedMedia = { ...previewSignedMedia, ...(actorSignedMedia || {}) };
                       return (
                         <UserHeader
                           nickname={nickname}
@@ -693,6 +725,7 @@ function App() {
                           icon={icon}
                           published={previewData.published}
                           postId={previewData.id}
+                          signedMedia={signedMedia}
                         />
                       );
                     })()}
@@ -718,76 +751,77 @@ function App() {
                     {(!previewData.summary || showContent) && previewData.content && (
                       <div dangerouslySetInnerHTML={{ __html: previewData.content }} />
                     )}
-                    {(!previewData.summary || showContent) && previewData.attachment && Array.isArray(previewData.attachment) && previewData.attachment.length > 0 && (
-                      <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        {previewData.attachment.map((att, idx) => {
-                          let url = null;
-                          if (typeof att === 'string') {
-                            url = att;
-                          } else if (att && typeof att === 'object') {
-                            // Handle nested URL structure
-                            if (typeof att.url === 'string') {
-                              url = att.url;
-                            } else if (att.url && typeof att.url === 'object' && att.url.href) {
-                              url = att.url.href;
-                            } else if (att.href) {
-                              url = att.href;
+                    {(!previewData.summary || showContent) && previewData.attachment && Array.isArray(previewData.attachment) && previewData.attachment.length > 0 && (() => {
+                      return (
+                        <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          {previewData.attachment.map((att, idx) => {
+                            let url = null;
+                            if (typeof att === 'string') {
+                              url = att;
+                            } else if (att && typeof att === 'object') {
+                              // Handle nested URL structure
+                              if (typeof att.url === 'string') {
+                                url = att.url;
+                              } else if (att.url && typeof att.url === 'object' && att.url.href) {
+                                url = att.url.href;
+                              } else if (att.href) {
+                                url = att.href;
+                              }
                             }
-                          }
-                          const mediaType = att.mediaType || (att && att.type) || '';
-                          const name = (att && att.name) || (att && att.summary) || '';
-                          
-                          if (!url) return null;
-                          
-                          if (mediaType.startsWith('image/')) {
-                            return (
-                              <img
-                                key={idx}
-                                src={getMediaUrl(url)}
-                                alt={name}
-                                onClick={() => setFullscreenMedia({ type: 'image', url, name })}
-                                style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain', cursor: 'pointer' }}
-                              />
-                            );
-                          } else if (mediaType.startsWith('video/')) {
-                            return (
-                              <video
-                                key={idx}
-                                src={getMediaUrl(url)}
-                                controls
-                                onClick={() => setFullscreenMedia({ type: 'video', url, name })}
-                                style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', cursor: 'pointer' }}
-                              >
-                                {name && <track kind="captions" />}
-                              </video>
-                            );
-                          } else if (mediaType.startsWith('audio/')) {
-                            return (
-                              <audio
-                                key={idx}
-                                src={getMediaUrl(url)}
-                                controls
-                                style={{ width: '100%', maxWidth: '500px' }}
-                              >
-                                {name || 'Audio playback not supported'}
-                              </audio>
-                            );
-                          } else {
-                            return (
-                              <a
-                                key={idx}
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ display: 'block', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', textDecoration: 'none', color: '#0066cc' }}
-                              >
-                                {name || url}
-                              </a>
-                            );
-                          }
-                        })}
-                      </div>
-                    )}
+                            const mediaType = att.mediaType || (att && att.type) || '';
+                            const name = (att && att.name) || (att && att.summary) || '';
+                            if (!url) return null;
+                            const signature = previewSignedMedia[url] || null;
+                            if (mediaType.startsWith('image/')) {
+                              return (
+                                <img
+                                  key={idx}
+                                  src={getMediaUrl(url, signature)}
+                                  alt={name}
+                                  onClick={() => setFullscreenMedia({ type: 'image', url, name, signature })}
+                                  style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain', cursor: 'pointer' }}
+                                />
+                              );
+                            } else if (mediaType.startsWith('video/')) {
+                              return (
+                                <video
+                                  key={idx}
+                                  src={getMediaUrl(url, signature)}
+                                  controls
+                                  onClick={() => setFullscreenMedia({ type: 'video', url, name, signature })}
+                                  style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', cursor: 'pointer' }}
+                                >
+                                  {name && <track kind="captions" />}
+                                </video>
+                              );
+                            } else if (mediaType.startsWith('audio/')) {
+                              return (
+                                <audio
+                                  key={idx}
+                                  src={getMediaUrl(url, signature)}
+                                  controls
+                                  style={{ width: '100%', maxWidth: '500px' }}
+                                >
+                                  {name || 'Audio playback not supported'}
+                                </audio>
+                              );
+                            } else {
+                              return (
+                                <a
+                                  key={idx}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ display: 'block', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', textDecoration: 'none', color: '#0066cc' }}
+                                >
+                                  {name || url}
+                                </a>
+                              );
+                            }
+                          })}
+                        </div>
+                      );
+                    })()}
                     {(!previewData.summary || showContent) && previewData.quoteUrl && (
                       <QuoteObject quoteUrl={previewData.quoteUrl} depth={0} maxDepth={3} />
                     )}
@@ -863,14 +897,14 @@ function App() {
         >
           {fullscreenMedia.type === 'image' ? (
             <img
-              src={getMediaUrl(fullscreenMedia.url)}
+              src={getMediaUrl(fullscreenMedia.url, fullscreenMedia.signature || null)}
               alt={fullscreenMedia.name || ''}
               onClick={(e) => e.stopPropagation()}
               style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain' }}
             />
           ) : (
             <video
-              src={getMediaUrl(fullscreenMedia.url)}
+              src={getMediaUrl(fullscreenMedia.url, fullscreenMedia.signature || null)}
               controls
               autoPlay
               onClick={(e) => e.stopPropagation()}
