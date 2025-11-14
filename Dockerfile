@@ -46,5 +46,5 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # Run the application with uvicorn
 # uvicorn is installed in system Python, so it's in PATH
-CMD ["uvicorn", "main:asgi_app", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
 

@@ -17,6 +17,13 @@ function getMediaUrl(url, signature = null) {
   return proxyUrl;
 }
 
+// Helper function to extract quote URL from various field names
+function getQuoteUrl(data) {
+  if (!data || typeof data !== 'object') return null;
+  // Try multiple possible field names
+  return data.quoteUrl || data.quote || data.quoteUri || data._misskey_quote || null;
+}
+
 // UserHeader component for rendering user info (profile pic, nickname, handle, timestamp)
 function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published, postId, signedMedia = {} }) {
   const iconSignature = icon ? (signedMedia[icon] || null) : null;
@@ -151,9 +158,10 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
         // Check for HTTP error status codes
         if (response.status >= 400) {
           const data = await response.json().catch(() => ({}));
+          // FastAPI returns 'detail' field, but also check 'error' for compatibility
           setErrorStatus({
             code: response.status,
-            message: data.error || `HTTP ${response.status} Error`
+            message: data.detail || data.error || `HTTP ${response.status} Error`
           });
           return;
         }
@@ -438,8 +446,8 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
           })}
         </div>
       )}
-      {shouldShowContent && quoteData.quoteUrl && (
-        <QuoteObject quoteUrl={quoteData.quoteUrl} depth={depth + 1} maxDepth={maxDepth} />
+      {shouldShowContent && getQuoteUrl(quoteData) && (
+        <QuoteObject quoteUrl={getQuoteUrl(quoteData)} depth={depth + 1} maxDepth={maxDepth} />
       )}
     </div>
     {fullscreenMedia && (
@@ -515,7 +523,8 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Failed to process URL');
+        // FastAPI returns 'detail' field, but also check 'error' for compatibility
+        setError(data.detail || data.error || `HTTP ${response.status} Error`);
         return;
       }
 
@@ -828,12 +837,12 @@ function App() {
                         </div>
                       );
                     })()}
-                    {(!previewData.summary || showContent) && previewData.quoteUrl && (
-                      <QuoteObject quoteUrl={previewData.quoteUrl} depth={0} maxDepth={3} />
+                    {(!previewData.summary || showContent) && getQuoteUrl(previewData) && (
+                      <QuoteObject quoteUrl={getQuoteUrl(previewData)} depth={0} maxDepth={3} />
                     )}
                   </div>
                 )}
-                {!previewData.content && previewData.quoteUrl && (
+                {!previewData.content && getQuoteUrl(previewData) && (
                   <div className="content-html">
                     {previewData.summary && (
                       <div style={{ marginBottom: '0.5rem', padding: '0.5rem', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', fontSize: '0.9rem' }}>
@@ -855,7 +864,7 @@ function App() {
                       </div>
                     )}
                     {(!previewData.summary || showContent) && (
-                      <QuoteObject quoteUrl={previewData.quoteUrl} depth={0} maxDepth={3} />
+                      <QuoteObject quoteUrl={getQuoteUrl(previewData)} depth={0} maxDepth={3} />
                     )}
                   </div>
                 )}

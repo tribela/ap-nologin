@@ -7,12 +7,21 @@ import secrets
 from urllib.parse import urlparse
 
 import httpx
-from asgiref.wsgi import WsgiToAsgi
-from flask import Flask, jsonify, request, send_from_directory, Response
-from flask_cors import CORS
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
-app = Flask(__name__, static_folder='dist', static_url_path='')
-CORS(app)
+app = FastAPI(title="AP NoLogin", description="View ActivityPub notes without login")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # HMAC secret key for signing media URLs
 # Use environment variable if set, otherwise generate a random secret
@@ -148,27 +157,27 @@ def sign_media_urls_in_content(content):
 
 
 # API routes
-@app.route("/api/health", methods=["GET"])
-def health():
-    response = jsonify({"status": "ok", "message": "Server is running"})
-    response.headers['Cache-Control'] = 'public, max-age=60'  # Cache for 1 minute
-    return response
+@app.get("/api/health")
+async def health():
+    return JSONResponse(
+        content={"status": "ok", "message": "Server is running"},
+        headers={'Cache-Control': 'public, max-age=60'}
+    )
 
 
-@app.route("/api/activity", methods=["GET"])
-def process_url():
-    try:
-        url = request.args.get('url', '').strip()
+@app.get("/api/activity")
+async def process_url(url: str = Query(..., description="ActivityPub URL to fetch")):
+    url = url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
 
-        if not url:
-            return jsonify({"error": "URL is required"}), 400
+    headers = {
+        "Accept": "application/activity+json"
+    }
 
-        # Fetch URL content using httpx with application/activity+json
-        headers = {
-            "Accept": "application/activity+json"
-        }
-        with httpx.Client(timeout=10.0, follow_redirects=True) as client:
-            response = client.get(url, headers=headers)
+    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+        try:
+            response = await client.get(url, headers=headers)
 
             # Check for HTTP error status codes
             if response.status_code >= 400:
@@ -185,7 +194,7 @@ def process_url():
                     response.status_code,
                     f"HTTP {response.status_code} Error"
                 )
-                return jsonify({"error": error_msg}), response.status_code
+                raise HTTPException(status_code=response.status_code, detail=error_msg)
 
             response.raise_for_status()
 
@@ -201,17 +210,26 @@ def process_url():
             )
 
             if not is_json:
-                return jsonify({"error": "URL does not appear to be an ActivityPub resource (not JSON)"}), 400
+                raise HTTPException(
+                    status_code=400,
+                    detail="URL does not appear to be an ActivityPub resource (not JSON)"
+                )
 
             # Parse JSON content
             try:
                 content = response.json()
             except Exception:
-                return jsonify({"error": "URL does not appear to be an ActivityPub resource (invalid JSON)"}), 400
+                raise HTTPException(
+                    status_code=400,
+                    detail="URL does not appear to be an ActivityPub resource (invalid JSON)"
+                )
 
             # Validate ActivityPub content
             if not is_activitypub_content(content, content_type):
-                return jsonify({"error": "URL does not appear to be an ActivityPub resource"}), 400
+                raise HTTPException(
+                    status_code=400,
+                    detail="URL does not appear to be an ActivityPub resource"
+                )
 
             # Sign media URLs
             signed_media = sign_media_urls_in_content(content) if isinstance(content, dict) else {}
@@ -229,50 +247,52 @@ def process_url():
             if signed_media:
                 result["_signed_media"] = signed_media
 
-            # Add cache headers for reverse proxy caching
-            response_obj = jsonify(result)
-            response_obj.headers['Cache-Control'] = 'public, max-age=300'  # Cache for 5 minutes
-            return response_obj
-    except httpx.HTTPStatusError as e:
-        # Handle HTTP status errors that weren't caught above
-        status_code = e.response.status_code
-        error_messages = {
-            401: "Unauthorized",
-            404: "Not Found",
-            410: "Gone",
-            403: "Forbidden",
-            500: "Internal Server Error",
-            502: "Bad Gateway",
-            503: "Service Unavailable",
-        }
-        error_msg = error_messages.get(
-            status_code,
-            f"HTTP {status_code} Error"
-        )
-        return jsonify({"error": error_msg}), status_code
-    except httpx.HTTPError as e:
-        return jsonify({"error": f"Failed to fetch URL: {str(e)}"}), 500
-    except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+            return JSONResponse(
+                content=result,
+                headers={'Cache-Control': 'public, max-age=300'}
+            )
+
+        except httpx.HTTPStatusError as e:
+            status_code = e.response.status_code
+            error_messages = {
+                401: "Unauthorized",
+                404: "Not Found",
+                410: "Gone",
+                403: "Forbidden",
+                500: "Internal Server Error",
+                502: "Bad Gateway",
+                503: "Service Unavailable",
+            }
+            error_msg = error_messages.get(
+                status_code,
+                f"HTTP {status_code} Error"
+            )
+            raise HTTPException(status_code=status_code, detail=error_msg)
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch URL: {str(e)}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 
-@app.route("/api/webfinger", methods=["GET"])
-def webfinger():
-    try:
-        resource = request.args.get('resource', '').strip()
-        actor_url = request.args.get('actor_url', '').strip()
+@app.get("/api/webfinger")
+async def webfinger(
+    resource: str = Query(None, description="Webfinger resource (acct:user@domain)"),
+    actor_url: str = Query(None, description="Direct actor URL")
+):
+    if not resource and not actor_url:
+        raise HTTPException(status_code=400, detail="resource or actor_url is required")
 
-        if not resource and not actor_url:
-            return jsonify({"error": "resource or actor_url is required"}), 400
+    headers = {
+        "Accept": "application/activity+json, application/jrd+json"
+    }
 
-        headers = {
-            "Accept": "application/activity+json, application/jrd+json"
-        }
-
-        with httpx.Client(timeout=10.0, follow_redirects=True) as client:
+    async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+        try:
             # If actor_url is provided, fetch it directly
             if actor_url:
-                response = client.get(actor_url, headers=headers)
+                response = await client.get(actor_url, headers=headers)
                 response.raise_for_status()
                 actor_data = response.json()
 
@@ -298,16 +318,17 @@ def webfinger():
                 }
                 if signed_media:
                     result["_signed_media"] = signed_media
-                response = jsonify(result)
-                response.headers['Cache-Control'] = 'public, max-age=300'  # Cache for 5 minutes
-                return response
+                return JSONResponse(
+                    content=result,
+                    headers={'Cache-Control': 'public, max-age=300'}
+                )
 
             # Otherwise, try webfinger lookup
             if resource.startswith('acct:'):
                 # Extract username and domain from acct:user@domain
                 acct_parts = resource[5:].split('@')
                 if len(acct_parts) != 2:
-                    return jsonify({"error": "Invalid acct format"}), 400
+                    raise HTTPException(status_code=400, detail="Invalid acct format")
                 username, domain = acct_parts
                 webfinger_url = f"https://{domain}/.well-known/webfinger?resource={resource}"
             else:
@@ -318,7 +339,7 @@ def webfinger():
 
             # Try webfinger first
             try:
-                response = client.get(webfinger_url, headers=headers)
+                response = await client.get(webfinger_url, headers=headers)
                 response.raise_for_status()
                 webfinger_data = response.json()
 
@@ -330,10 +351,10 @@ def webfinger():
                         break
 
                 if not actor_url:
-                    return jsonify({"error": "No ActivityPub actor found"}), 404
+                    raise HTTPException(status_code=404, detail="No ActivityPub actor found")
 
                 # Fetch the actor
-                response = client.get(actor_url, headers=headers)
+                response = await client.get(actor_url, headers=headers)
                 response.raise_for_status()
                 actor_data = response.json()
 
@@ -359,13 +380,15 @@ def webfinger():
                 }
                 if signed_media:
                     result["_signed_media"] = signed_media
-                response = jsonify(result)
-                response.headers['Cache-Control'] = 'public, max-age=300'  # Cache for 5 minutes
-                return response
+                return JSONResponse(
+                    content=result,
+                    headers={'Cache-Control': 'public, max-age=300'}
+                )
+
             except httpx.HTTPError:
                 # If webfinger fails, try to use resource as direct actor URL
                 if resource.startswith('http://') or resource.startswith('https://'):
-                    response = client.get(resource, headers=headers)
+                    response = await client.get(resource, headers=headers)
                     response.raise_for_status()
                     actor_data = response.json()
 
@@ -391,114 +414,175 @@ def webfinger():
                     }
                     if signed_media:
                         result["_signed_media"] = signed_media
-                    return jsonify(result)
+                    return JSONResponse(content=result)
                 raise
 
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch webfinger: {str(e)}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+
+
+@app.get("/api/media")
+async def proxy_media(
+    url: str = Query(..., description="Media URL to proxy"),
+    sig: str = Query(..., description="HMAC signature")
+):
+    media_url = url.strip()
+    if not media_url:
+        raise HTTPException(status_code=400, detail="URL parameter is required")
+
+    # Verify HMAC signature - signature is required for security
+    if not sig:
+        raise HTTPException(status_code=403, detail="Signature is required")
+
+    if not verify_media_signature(media_url, sig):
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
+    # Validate URL format
+    try:
+        parsed = urlparse(media_url)
+        # Only allow http and https protocols
+        if parsed.scheme not in ('http', 'https'):
+            raise HTTPException(status_code=400, detail="Only HTTP and HTTPS URLs are allowed")
+        # Must have a valid hostname
+        if not parsed.netloc:
+            raise HTTPException(status_code=400, detail="Invalid URL format")
+        # Prevent localhost/internal network access using ipaddress module
+        hostname = parsed.hostname.lower()
+        # Check if hostname is a blocked hostname
+        blocked_hostnames = ('localhost', '0.0.0.0')
+        if hostname in blocked_hostnames:
+            raise HTTPException(status_code=403, detail="Local network access is not allowed")
+
+        # Try to parse as IP address
+        try:
+            ip = ipaddress.ip_address(hostname)
+            # Block private, loopback, link-local, and reserved addresses
+            if (ip.is_private or ip.is_loopback or ip.is_link_local or
+                    ip.is_reserved or ip.is_multicast):
+                raise HTTPException(status_code=403, detail="Local network access is not allowed")
+        except ValueError:
+            # Not an IP address, check if it's a blocked hostname
+            if hostname == 'localhost':
+                raise HTTPException(status_code=403, detail="Local network access is not allowed")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid URL format")
+
+    # Use streaming to avoid loading entire file into memory
+    # We need to keep the client and response alive during streaming
+    # FastAPI StreamingResponse executes the generator after the function returns,
+    # so we can't use async with which closes before the generator runs
+    client = httpx.AsyncClient(timeout=15.0, follow_redirects=True, max_redirects=5)
+    response = None
+    stream_context = None
+    try:
+        # Manually enter the stream context to keep it open
+        stream_context = client.stream('GET', media_url)
+        response = await stream_context.__aenter__()
+        
+        # Read status line and headers
+        await response.aread()
+        response.raise_for_status()
+
+        # Validate content type - only allow media types
+        content_type = response.headers.get("content-type", "").lower()
+        allowed_types = (
+            "image/", "video/", "audio/",
+            "application/octet-stream"  # Some servers don't set proper content-type
+        )
+        if not any(content_type.startswith(t) for t in allowed_types):
+            # Still allow if content-type is missing (some servers don't set it)
+            if content_type:
+                await stream_context.__aexit__(None, None, None)
+                await client.aclose()
+                raise HTTPException(status_code=400, detail="Invalid content type")
+
+        # Stream the response in chunks for better performance
+        # Response stays open while FastAPI consumes the generator
+        async def generate():
+            try:
+                async for chunk in response.aiter_bytes(chunk_size=8192):
+                    yield chunk
+            finally:
+                # Clean up: exit the stream context and close the client
+                try:
+                    if stream_context:
+                        await stream_context.__aexit__(None, None, None)
+                except Exception:
+                    pass
+                try:
+                    await client.aclose()
+                except Exception:
+                    pass
+
+        # Return the media with appropriate content type and cache headers
+        headers = {
+            "Content-Type": content_type or "application/octet-stream",
+            "Cache-Control": "public, max-age=3600"  # Cache for 1 hour
+        }
+        return StreamingResponse(
+            generate(),
+            headers=headers,
+            status_code=200,
+            media_type=content_type or "application/octet-stream"
+        )
+
     except httpx.HTTPError as e:
-        return jsonify({"error": f"Failed to fetch webfinger: {str(e)}"}), 500
+        if stream_context and response:
+            try:
+                await stream_context.__aexit__(None, None, None)
+            except Exception:
+                pass
+        await client.aclose()
+        raise HTTPException(status_code=500, detail=f"Failed to fetch media: {str(e)}")
+    except HTTPException:
+        if stream_context and response:
+            try:
+                await stream_context.__aexit__(None, None, None)
+            except Exception:
+                pass
+        await client.aclose()
+        raise
     except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        if stream_context and response:
+            try:
+                await stream_context.__aexit__(None, None, None)
+            except Exception:
+                pass
+        await client.aclose()
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+
+
+# Mount static files
+static_dir = "dist"
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
 # Serve React app for all non-API routes
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve(path):
-    if path != "" and os.path.exists(app.static_folder + '/' + path):
-        return send_from_directory(app.static_folder, path)
-    else:
-        return send_from_directory(app.static_folder, 'index.html')
+@app.get("/{path:path}")
+async def serve(path: str, request: Request):
+    # If it's an API route, let it pass through
+    if path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="Not found")
 
-
-def main():
-    print("Starting Flask server...")
-    print(f"Serving React app from: {app.static_folder}")
-    debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
-    app.run(debug=debug, use_reloader=debug, host="0.0.0.0", port=5000)
-
-
-@app.route("/api/media", methods=["GET"])
-def proxy_media():
-    try:
-        media_url = request.args.get('url', '').strip()
-        if not media_url:
-            return jsonify({"error": "URL parameter is required"}), 400
-
-        # Verify HMAC signature - signature is required for security
-        signature = request.args.get('sig', '')
-        if not signature:
-            return jsonify({"error": "Signature is required"}), 403
-
-        if not verify_media_signature(media_url, signature):
-            return jsonify({"error": "Invalid signature"}), 403
-
-        # Validate URL format
-        try:
-            parsed = urlparse(media_url)
-            # Only allow http and https protocols
-            if parsed.scheme not in ('http', 'https'):
-                return jsonify({"error": "Only HTTP and HTTPS URLs are allowed"}), 400
-            # Must have a valid hostname
-            if not parsed.netloc:
-                return jsonify({"error": "Invalid URL format"}), 400
-            # Prevent localhost/internal network access using ipaddress module
-            hostname = parsed.hostname.lower()
-            # Check if hostname is a blocked hostname
-            blocked_hostnames = ('localhost', '0.0.0.0')
-            if hostname in blocked_hostnames:
-                return jsonify({"error": "Local network access is not allowed"}), 403
-
-            # Try to parse as IP address
-            try:
-                ip = ipaddress.ip_address(hostname)
-                # Block private, loopback, link-local, and reserved addresses
-                if (ip.is_private or ip.is_loopback or ip.is_link_local or
-                        ip.is_reserved or ip.is_multicast):
-                    return jsonify({"error": "Local network access is not allowed"}), 403
-            except ValueError:
-                # Not an IP address, check if it's a blocked hostname
-                if hostname == 'localhost':
-                    return jsonify({"error": "Local network access is not allowed"}), 403
-        except Exception:
-            return jsonify({"error": "Invalid URL format"}), 400
-
-        # Use streaming to avoid loading entire file into memory
-        with httpx.Client(timeout=15.0, follow_redirects=True, max_redirects=5) as client:
-            with client.stream('GET', media_url) as response:
-                response.raise_for_status()
-
-                # Validate content type - only allow media types
-                content_type = response.headers.get("content-type", "").lower()
-                allowed_types = (
-                    "image/", "video/", "audio/",
-                    "application/octet-stream"  # Some servers don't set proper content-type
-                )
-                if not any(content_type.startswith(t) for t in allowed_types):
-                    # Still allow if content-type is missing (some servers don't set it)
-                    if content_type:
-                        return jsonify({"error": "Invalid content type"}), 400
-
-                # Stream the response in chunks for better performance
-                def generate():
-                    for chunk in response.iter_bytes(chunk_size=8192):
-                        yield chunk
-
-                # Return the media with appropriate content type and cache headers
-                headers = {
-                    "Content-Type": content_type or "application/octet-stream",
-                    "Cache-Control": "public, max-age=3600"  # Cache for 1 hour
-                }
-                return Response(generate(), headers=headers, status_code=200)
-
-    except httpx.HTTPError as e:
-        return jsonify({"error": f"Failed to fetch media: {str(e)}"}), 500
-    except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-
-
-# Wrap Flask app as ASGI for uvicorn
-asgi_app = WsgiToAsgi(app)
+    static_path = os.path.join(static_dir, path)
+    # If the file exists, serve it
+    if path and os.path.exists(static_path) and os.path.isfile(static_path):
+        return FileResponse(static_path)
+    # Otherwise serve index.html for SPA routing
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    raise HTTPException(status_code=404, detail="Not found")
 
 
 if __name__ == "__main__":
-    main()
+    import uvicorn
+    debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    uvicorn.run("main:app", host="0.0.0.0", port=5000, reload=debug)
