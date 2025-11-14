@@ -513,7 +513,7 @@ function App() {
               onClick={handleRun}
               disabled={loading || !url.trim()}
             >
-              {loading ? 'Loading...' : 'Run'}
+              {loading ? 'Loading...' : 'Show'}
             </button>
           </div>
           {error && <div className="error-message">{error}</div>}
