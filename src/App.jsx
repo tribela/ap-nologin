@@ -1,6 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
+// UserHeader component for rendering user info (profile pic, nickname, handle, timestamp)
+function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published, postId }) {
+  return (
+    <div style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', flex: 1 }}>
+        {icon && (
+          <img src={icon} alt="Profile" style={{ width: '2.5em', height: '2.5em', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+        )}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ fontSize: '0.9rem' }}>
+            {renderNicknameWithEmojis(nickname, tags)}
+          </div>
+          {handle && (
+            <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
+              {actorId ? (
+                <a href={actorId} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
+                <span className="handle">{handle}</span>
+              </a>
+              ) : (
+                <span className="handle">{handle}</span>
+              )}
+            </div>
+          )}
+          {!handle && !nickname && fallback && (
+            <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
+              <span>{fallback}</span>
+            </div>
+          )}
+        </div>
+      </div>
+      {published && (
+        <div style={{ fontSize: '0.85rem', opacity: 0.7, flexShrink: 0 }}>
+          {postId ? (
+            <a href={postId} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
+              {new Date(published).toISOString()}
+            </a>
+          ) : (
+            <span>{new Date(published).toISOString()}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Function to render nickname with custom emojis
 function renderNicknameWithEmojis(nickname, tags = []) {
   if (!nickname) {
@@ -163,16 +208,17 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
         nickname: actorInfo.nickname || null,
         fallback: null,
         tags: actorInfo.tag || [],
-        actorId: actorInfo.id || null
+        actorId: actorInfo.id || null,
+        icon: actorInfo.icon || null
       };
     }
 
     if (!data || !data.attributedTo) {
-      return { handle: null, nickname: null, fallback: null, tags: [], actorId: null };
+      return { handle: null, nickname: null, fallback: null, tags: [], actorId: null, icon: null };
     }
 
     if (typeof data.attributedTo === 'string') {
-      return { handle: null, nickname: null, fallback: data.attributedTo, tags: [], actorId: data.attributedTo };
+      return { handle: null, nickname: null, fallback: data.attributedTo, tags: [], actorId: data.attributedTo, icon: null };
     }
 
     if (typeof data.attributedTo === 'object' && data.attributedTo !== null) {
@@ -181,6 +227,16 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
       const fallback = data.attributedTo.id || JSON.stringify(data.attributedTo);
       const tags = data.attributedTo.tag || [];
       const actorId = data.attributedTo.id || null;
+      // Extract icon URL
+      let iconUrl = null;
+      const icon = data.attributedTo.icon;
+      if (icon) {
+        if (typeof icon === 'object' && icon.url) {
+          iconUrl = icon.url;
+        } else if (typeof icon === 'string') {
+          iconUrl = icon;
+        }
+      }
       // Try to extract domain from id URL
       let domain = '';
       if (data.attributedTo.id) {
@@ -192,10 +248,10 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
         }
       }
       const fullHandle = handle && domain ? `@${handle}@${domain}` : handle ? `@${handle}` : '';
-      return { handle: fullHandle, nickname, fallback, tags, actorId };
+      return { handle: fullHandle, nickname, fallback, tags, actorId, icon: iconUrl };
     }
 
-    return { handle: null, nickname: null, fallback: null, tags: [], actorId: null };
+    return { handle: null, nickname: null, fallback: null, tags: [], actorId: null, icon: null };
   };
 
   if (!quoteUrl) {
@@ -241,39 +297,21 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
     return null;
   }
 
-  const { handle, nickname, fallback, tags, actorId } = parseAttributedTo(quoteData, quoteActorInfo);
+  const { handle, nickname, fallback, tags, actorId, icon } = parseAttributedTo(quoteData, quoteActorInfo);
 
   return (
     <div className="content-html" style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
       {(quoteData.published || quoteData.attributedTo) && (
-        <div style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
-          {quoteData.attributedTo && (
-            <>
-              {renderNicknameWithEmojis(nickname, tags)}
-              {nickname && handle && ' '}
-              {handle && (
-                actorId ? (
-                  <a href={actorId} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#0066cc', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
-                    <span className="handle">{handle}</span>
-                  </a>
-                ) : (
-                  <span className="handle">{handle}</span>
-                )
-              )}
-              {!handle && !nickname && fallback && <span>{fallback}</span>}
-            </>
-          )}
-          {quoteData.published && quoteData.attributedTo && ' • '}
-          {quoteData.published && (
-            quoteData.id ? (
-              <a href={quoteData.id} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#0066cc', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
-                {new Date(quoteData.published).toISOString()}
-              </a>
-            ) : (
-              <span>{new Date(quoteData.published).toISOString()}</span>
-            )
-          )}
-        </div>
+        <UserHeader
+          nickname={nickname}
+          handle={handle}
+          fallback={fallback}
+          tags={tags}
+          actorId={actorId}
+          icon={icon}
+          published={quoteData.published}
+          postId={quoteData.id}
+        />
       )}
       {quoteData.content && (
         <div dangerouslySetInnerHTML={{ __html: quoteData.content }} />
@@ -403,17 +441,18 @@ function App() {
         nickname: actorInfo.nickname || null,
         fallback: null,
         tags: actorInfo.tag || [],
-        actorId: actorInfo.id || null
+        actorId: actorInfo.id || null,
+        icon: actorInfo.icon || null
       };
     }
 
     // Fallback to previewData
     if (!previewData || !previewData.attributedTo) {
-      return { handle: null, nickname: null, fallback: null, tags: [], actorId: null };
+      return { handle: null, nickname: null, fallback: null, tags: [], actorId: null, icon: null };
     }
 
     if (typeof previewData.attributedTo === 'string') {
-      return { handle: null, nickname: null, fallback: previewData.attributedTo, tags: [], actorId: previewData.attributedTo };
+      return { handle: null, nickname: null, fallback: previewData.attributedTo, tags: [], actorId: previewData.attributedTo, icon: null };
     }
 
     if (typeof previewData.attributedTo === 'object' && previewData.attributedTo !== null) {
@@ -423,6 +462,16 @@ function App() {
       const fallback = previewData.attributedTo.id || JSON.stringify(previewData.attributedTo);
       const tags = previewData.attributedTo.tag || [];
       const actorId = previewData.attributedTo.id || null;
+      // Extract icon URL
+      let iconUrl = null;
+      const icon = previewData.attributedTo.icon;
+      if (icon) {
+        if (typeof icon === 'object' && icon.url) {
+          iconUrl = icon.url;
+        } else if (typeof icon === 'string') {
+          iconUrl = icon;
+        }
+      }
       // Try to extract domain from id URL
       let domain = '';
       if (previewData.attributedTo.id) {
@@ -434,10 +483,10 @@ function App() {
         }
       }
       const fullHandle = handle && domain ? `@${handle}@${domain}` : handle ? `@${handle}` : '';
-      return { handle: fullHandle, nickname, fallback, tags, actorId };
+      return { handle: fullHandle, nickname, fallback, tags, actorId, icon: iconUrl };
     }
 
-    return { handle: null, nickname: null, fallback: null, tags: [], actorId: null };
+    return { handle: null, nickname: null, fallback: null, tags: [], actorId: null, icon: null };
   };
 
   return (
@@ -477,36 +526,18 @@ function App() {
                 {previewData.content && (
                   <div className="content-html">
                     {(previewData.published || previewData.attributedTo) && (() => {
-                      const { handle, nickname, fallback, tags, actorId } = parseAttributedTo();
+                      const { handle, nickname, fallback, tags, actorId, icon } = parseAttributedTo();
                       return (
-                        <div style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
-                          {previewData.attributedTo && (
-                            <>
-                              {renderNicknameWithEmojis(nickname, tags)}
-                              {nickname && handle && ' '}
-                              {handle && (
-                                actorId ? (
-                                  <a href={actorId} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#0066cc', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
-                                    <span className="handle">{handle}</span>
-                                  </a>
-                                ) : (
-                                  <span className="handle">{handle}</span>
-                                )
-                              )}
-                              {!handle && !nickname && fallback && <span>{fallback}</span>}
-                            </>
-                          )}
-                          {previewData.published && previewData.attributedTo && ' • '}
-                          {previewData.published && (
-                            previewData.id ? (
-                              <a href={previewData.id} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#0066cc', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
-                                {new Date(previewData.published).toISOString()}
-                              </a>
-                            ) : (
-                              <span>{new Date(previewData.published).toISOString()}</span>
-                            )
-                          )}
-                        </div>
+                        <UserHeader
+                          nickname={nickname}
+                          handle={handle}
+                          fallback={fallback}
+                          tags={tags}
+                          actorId={actorId}
+                          icon={icon}
+                          published={previewData.published}
+                          postId={previewData.id}
+                        />
                       );
                     })()}
                     <div dangerouslySetInnerHTML={{ __html: previewData.content }} />

@@ -122,13 +122,21 @@ def webfinger():
                 # Extract domain from actor URL
                 parsed = urlparse(actor_url)
                 domain = parsed.netloc or ''
+                # Extract icon URL
+                icon_url = None
+                icon = actor_data.get('icon')
+                if isinstance(icon, dict):
+                    icon_url = icon.get('url')
+                elif isinstance(icon, str):
+                    icon_url = icon
                 return jsonify({
                     "success": True,
                     "handle": actor_data.get('preferredUsername', ''),
                     "nickname": actor_data.get('name', ''),
                     "id": actor_data.get('id', actor_url),
                     "domain": domain,
-                    "tag": actor_data.get('tag', [])
+                    "tag": actor_data.get('tag', []),
+                    "icon": icon_url
                 })
 
             # Otherwise, try webfinger lookup
@@ -169,13 +177,21 @@ def webfinger():
                 # Extract domain from actor URL
                 parsed = urlparse(actor_url)
                 domain = parsed.netloc or ''
+                # Extract icon URL
+                icon_url = None
+                icon = actor_data.get('icon')
+                if isinstance(icon, dict):
+                    icon_url = icon.get('url')
+                elif isinstance(icon, str):
+                    icon_url = icon
                 return jsonify({
                     "success": True,
                     "handle": actor_data.get('preferredUsername', ''),
                     "nickname": actor_data.get('name', ''),
                     "id": actor_data.get('id', actor_url),
                     "domain": domain,
-                    "tag": actor_data.get('tag', [])
+                    "tag": actor_data.get('tag', []),
+                    "icon": icon_url
                 })
             except httpx.HTTPError:
                 # If webfinger fails, try to use resource as direct actor URL
@@ -186,13 +202,22 @@ def webfinger():
                     # Extract domain from resource URL
                     parsed = urlparse(resource)
                     domain = parsed.netloc or ''
+                    # Extract icon URL
+                    icon_url = None
+                    icon = actor_data.get('icon')
+                    if isinstance(icon, dict):
+                        icon_url = icon.get('url')
+                    elif isinstance(icon, str):
+                        icon_url = icon
+
                     return jsonify({
                         "success": True,
                         "handle": actor_data.get('preferredUsername', ''),
                         "nickname": actor_data.get('name', ''),
                         "id": actor_data.get('id', resource),
                         "domain": domain,
-                        "tag": actor_data.get('tag', [])
+                        "tag": actor_data.get('tag', []),
+                        "icon": icon_url
                     })
                 raise
 
