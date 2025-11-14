@@ -319,19 +319,10 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
         />
       )}
       {quoteData.summary && (
-        <div style={{ marginBottom: '0.5rem', padding: '0.5rem', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', fontSize: '0.9rem' }}>
+        <div className="content-warning">
           <strong>Content Warning:</strong> {quoteData.summary}
           <button
             onClick={() => setShowContent(!showContent)}
-            style={{
-              marginLeft: '0.5rem',
-              padding: '0.25rem 0.5rem',
-              backgroundColor: '#fff',
-              border: '1px solid #ffc107',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '0.85rem'
-            }}
           >
             {showContent ? 'Hide' : 'Show'}
           </button>
@@ -754,19 +745,10 @@ function App() {
                       );
                     })()}
                     {previewData.summary && (
-                      <div style={{ marginBottom: '0.5rem', padding: '0.5rem', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', fontSize: '0.9rem' }}>
+                      <div className="content-warning">
                         <strong>Content Warning:</strong> {previewData.summary}
                         <button
                           onClick={() => setShowContent(!showContent)}
-                          style={{
-                            marginLeft: '0.5rem',
-                            padding: '0.25rem 0.5rem',
-                            backgroundColor: '#fff',
-                            border: '1px solid #ffc107',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.85rem'
-                          }}
                         >
                           {showContent ? 'Hide' : 'Show'}
                         </button>
@@ -893,19 +875,10 @@ function App() {
                 {!getContent(previewData) && getQuoteUrl(previewData) && (
                   <div className="content-html">
                     {previewData.summary && (
-                      <div style={{ marginBottom: '0.5rem', padding: '0.5rem', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', fontSize: '0.9rem' }}>
+                      <div className="content-warning">
                         <strong>Content Warning:</strong> {previewData.summary}
                         <button
                           onClick={() => setShowContent(!showContent)}
-                          style={{
-                            marginLeft: '0.5rem',
-                            padding: '0.25rem 0.5rem',
-                            backgroundColor: '#fff',
-                            border: '1px solid #ffc107',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.85rem'
-                          }}
                         >
                           {showContent ? 'Hide' : 'Show'}
                         </button>
