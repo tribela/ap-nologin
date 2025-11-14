@@ -563,6 +563,36 @@ static_dir = "dist"
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
+# Mount public directory for manifest.json and icons
+public_dir = "public"
+if os.path.exists(public_dir):
+    app.mount("/public", StaticFiles(directory=public_dir), name="public")
+
+
+# Serve manifest.json and icons from public directory
+@app.get("/manifest.json")
+async def serve_manifest():
+    manifest_path = os.path.join(public_dir, "manifest.json")
+    if os.path.exists(manifest_path):
+        return FileResponse(manifest_path, media_type="application/manifest+json")
+    raise HTTPException(status_code=404, detail="manifest.json not found")
+
+
+@app.get("/icon-192.png")
+async def serve_icon_192():
+    icon_path = os.path.join(public_dir, "icon-192.png")
+    if os.path.exists(icon_path):
+        return FileResponse(icon_path, media_type="image/png")
+    raise HTTPException(status_code=404, detail="icon-192.png not found")
+
+
+@app.get("/icon-512.png")
+async def serve_icon_512():
+    icon_path = os.path.join(public_dir, "icon-512.png")
+    if os.path.exists(icon_path):
+        return FileResponse(icon_path, media_type="image/png")
+    raise HTTPException(status_code=404, detail="icon-512.png not found")
+
 
 # Serve React app for all non-API routes
 @app.get("/{path:path}")

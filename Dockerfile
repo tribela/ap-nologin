@@ -34,6 +34,9 @@ RUN uv sync --frozen --no-dev
 # Copy backend source
 COPY main.py ./
 
+# Copy public directory (for manifest.json and icons)
+COPY public/ ./public/
+
 # Copy built frontend from previous stage
 COPY --from=frontend-builder /app/dist ./dist
 
