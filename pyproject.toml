@@ -1,0 +1,35 @@
+[project]
+name = "msk-nologin"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "flask>=3.0.0",
+    "flask-cors>=4.0.0",
+    "httpx>=0.25.0",
+]
+
+[tool.flake8]
+max-line-length = 120
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "node_modules",
+    "dist",
+    "build",
+    "*.egg-info",
+]
+per-file-ignores = [
+    "__init__.py:F401",  # unused imports
+]
+import-order-style = "edited"
+
+[dependency-groups]
+dev = [
+    "flake8>=7.3.0",
+    "flake8-import-order>=0.19.2",
+    "flake8-pyproject>=1.2.0",
+]
