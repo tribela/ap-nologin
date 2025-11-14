@@ -127,7 +127,8 @@ def webfinger():
                     "handle": actor_data.get('preferredUsername', ''),
                     "nickname": actor_data.get('name', ''),
                     "id": actor_data.get('id', actor_url),
-                    "domain": domain
+                    "domain": domain,
+                    "tag": actor_data.get('tag', [])
                 })
 
             # Otherwise, try webfinger lookup
@@ -173,7 +174,8 @@ def webfinger():
                     "handle": actor_data.get('preferredUsername', ''),
                     "nickname": actor_data.get('name', ''),
                     "id": actor_data.get('id', actor_url),
-                    "domain": domain
+                    "domain": domain,
+                    "tag": actor_data.get('tag', [])
                 })
             except httpx.HTTPError:
                 # If webfinger fails, try to use resource as direct actor URL
@@ -189,7 +191,8 @@ def webfinger():
                         "handle": actor_data.get('preferredUsername', ''),
                         "nickname": actor_data.get('name', ''),
                         "id": actor_data.get('id', resource),
-                        "domain": domain
+                        "domain": domain,
+                        "tag": actor_data.get('tag', [])
                     })
                 raise
 

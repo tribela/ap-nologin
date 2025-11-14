@@ -1,6 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
+// Function to render nickname with custom emojis
+function renderNicknameWithEmojis(nickname, tags = []) {
+  if (!nickname) {
+    return null;
+  }
+
+  // Create a map of emoji names to URLs
+  const emojiMap = {};
+  if (Array.isArray(tags)) {
+    tags.forEach((tag) => {
+      if (tag.type === 'Emoji' && tag.name && tag.icon && tag.icon.url) {
+        emojiMap[tag.name] = tag.icon.url;
+      }
+    });
+  }
+
+  // If no emojis, return plain text
+  if (Object.keys(emojiMap).length === 0) {
+    return <span className="nickname">{nickname}</span>;
+  }
+
+  // Replace emoji patterns with images
+  const parts = [];
+  let lastIndex = 0;
+  const emojiPattern = /:([a-zA-Z0-9_]+):/g;
+  let match;
+
+  while ((match = emojiPattern.exec(nickname)) !== null) {
+    // Add text before the emoji
+    if (match.index > lastIndex) {
+      parts.push(nickname.substring(lastIndex, match.index));
+    }
+
+    const emojiName = `:${match[1]}:`;
+    if (emojiMap[emojiName]) {
+      parts.push(
+        <img
+          key={match.index}
+          src={emojiMap[emojiName]}
+          alt={emojiName}
+          style={{ width: '1em', height: '1em', verticalAlign: 'middle', margin: '0 0.1em' }}
+        />
+      );
+    } else {
+      // Emoji not found, keep the text
+      parts.push(emojiName);
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add remaining text
+  if (lastIndex < nickname.length) {
+    parts.push(nickname.substring(lastIndex));
+  }
+
+  return <span className="nickname">{parts.length > 0 ? parts : nickname}</span>;
+}
+
 // QuoteObject component for recursive rendering
 function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
   const [quoteData, setQuoteData] = useState(null);
@@ -102,22 +161,24 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
       return {
         handle: fullHandle,
         nickname: actorInfo.nickname || null,
-        fallback: null
+        fallback: null,
+        tags: actorInfo.tag || []
       };
     }
 
     if (!data || !data.attributedTo) {
-      return { handle: null, nickname: null, fallback: null };
+      return { handle: null, nickname: null, fallback: null, tags: [] };
     }
 
     if (typeof data.attributedTo === 'string') {
-      return { handle: null, nickname: null, fallback: data.attributedTo };
+      return { handle: null, nickname: null, fallback: data.attributedTo, tags: [] };
     }
 
     if (typeof data.attributedTo === 'object' && data.attributedTo !== null) {
       const handle = data.attributedTo.preferredUsername || '';
       const nickname = data.attributedTo.name || null;
       const fallback = data.attributedTo.id || JSON.stringify(data.attributedTo);
+      const tags = data.attributedTo.tag || [];
       // Try to extract domain from id URL
       let domain = '';
       if (data.attributedTo.id) {
@@ -129,10 +190,10 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
         }
       }
       const fullHandle = handle && domain ? `@${handle}@${domain}` : handle ? `@${handle}` : '';
-      return { handle: fullHandle, nickname, fallback };
+      return { handle: fullHandle, nickname, fallback, tags };
     }
 
-    return { handle: null, nickname: null, fallback: null };
+    return { handle: null, nickname: null, fallback: null, tags: [] };
   };
 
   if (!quoteUrl) {
@@ -142,7 +203,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
   // If max depth exceeded, show simple "quoted content" message
   if (depth >= maxDepth) {
     return (
-      <div className="quote-object" style={{ marginLeft: `${depth * 20}px`, marginTop: '1rem', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
+      <div className="quote-object" style={{ marginTop: '1rem', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
         <div style={{ fontStyle: 'italic', color: '#666' }}>quoted content</div>
       </div>
     );
@@ -150,7 +211,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
 
   if (loading) {
     return (
-      <div className="quote-object" style={{ marginLeft: `${depth * 20}px`, marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px' }}>
+      <div className="quote-object" style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px' }}>
         <div>Loading quote...</div>
       </div>
     );
@@ -166,7 +227,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
     };
     const color = errorColors[errorStatus.code] || '#d32f2f';
     return (
-      <div className="quote-object" style={{ marginLeft: `${depth * 20}px`, marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
+      <div className="quote-object" style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
         <div style={{ color, fontWeight: 'bold' }}>
           {errorStatus.message} ({errorStatus.code})
         </div>
@@ -178,15 +239,15 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
     return null;
   }
 
-  const { handle, nickname, fallback } = parseAttributedTo(quoteData, quoteActorInfo);
+  const { handle, nickname, fallback, tags } = parseAttributedTo(quoteData, quoteActorInfo);
 
   return (
-    <div className="content-html" style={{ marginLeft: `${depth * 20}px`, marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
+    <div className="content-html" style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
       {(quoteData.published || quoteData.attributedTo) && (
         <div style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
           {quoteData.attributedTo && (
             <>
-              {nickname && <span className="nickname">{nickname}</span>}
+              {renderNicknameWithEmojis(nickname, tags)}
               {nickname && handle && ' '}
               {handle && <span className="handle">{handle}</span>}
               {!handle && !nickname && fallback && <span>{fallback}</span>}
@@ -324,17 +385,18 @@ function App() {
       return {
         handle: fullHandle,
         nickname: actorInfo.nickname || null,
-        fallback: null
+        fallback: null,
+        tags: actorInfo.tag || []
       };
     }
 
     // Fallback to previewData
     if (!previewData || !previewData.attributedTo) {
-      return { handle: null, nickname: null, fallback: null };
+      return { handle: null, nickname: null, fallback: null, tags: [] };
     }
 
     if (typeof previewData.attributedTo === 'string') {
-      return { handle: null, nickname: null, fallback: previewData.attributedTo };
+      return { handle: null, nickname: null, fallback: previewData.attributedTo, tags: [] };
     }
 
     if (typeof previewData.attributedTo === 'object' && previewData.attributedTo !== null) {
@@ -342,6 +404,7 @@ function App() {
       const handle = previewData.attributedTo.preferredUsername || '';
       const nickname = previewData.attributedTo.name || null;
       const fallback = previewData.attributedTo.id || JSON.stringify(previewData.attributedTo);
+      const tags = previewData.attributedTo.tag || [];
       // Try to extract domain from id URL
       let domain = '';
       if (previewData.attributedTo.id) {
@@ -353,10 +416,10 @@ function App() {
         }
       }
       const fullHandle = handle && domain ? `@${handle}@${domain}` : handle ? `@${handle}` : '';
-      return { handle: fullHandle, nickname, fallback };
+      return { handle: fullHandle, nickname, fallback, tags };
     }
 
-    return { handle: null, nickname: null, fallback: null };
+    return { handle: null, nickname: null, fallback: null, tags: [] };
   };
 
   return (
@@ -396,12 +459,12 @@ function App() {
                 {previewData.content && (
                   <div className="content-html">
                     {(previewData.published || previewData.attributedTo) && (() => {
-                      const { handle, nickname, fallback } = parseAttributedTo();
+                      const { handle, nickname, fallback, tags } = parseAttributedTo();
                       return (
                         <div style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
                           {previewData.attributedTo && (
                             <>
-                              {nickname && <span className="nickname">{nickname}</span>}
+                              {renderNicknameWithEmojis(nickname, tags)}
                               {nickname && handle && ' '}
                               {handle && <span className="handle">{handle}</span>}
                               {!handle && !nickname && fallback && <span>{fallback}</span>}
