@@ -87,7 +87,7 @@ export function renderHtmlWithEmojis(htmlContent, tags = [], signedMedia = {}) {
                     key={`${keyPrefix}-emoji-${keyCounter++}`}
                     src={getMediaUrl(emojiUrl, emojiSignature)}
                     alt={emojiName}
-                    style={{ width: '1em', height: '1em', verticalAlign: 'middle', margin: '0 0.1em' }}
+                    className="custom-emoji"
                   />
                 );
               } else {
@@ -189,7 +189,7 @@ export function renderNicknameWithEmojis(nickname, tags = [], signedMedia = {}) 
           key={match.index}
           src={getMediaUrl(emojiUrl, emojiSignature)}
           alt={emojiName}
-          style={{ width: '1em', height: '1em', verticalAlign: 'middle', margin: '0 0.1em' }}
+          className="custom-emoji"
         />
       );
     } else {

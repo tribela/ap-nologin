@@ -502,3 +502,10 @@ section {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   pointer-events: none;
 }
+
+/* Custom emoji styles */
+.custom-emoji {
+  height: 1em;
+  vertical-align: middle;
+  margin: 0 0.1em;
+}
