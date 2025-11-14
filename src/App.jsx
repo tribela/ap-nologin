@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import './App.scss';
 import { getMediaUrl, renderHtmlWithEmojis, renderNicknameWithEmojis } from './utils/emojiUtils';
+import SearchIcon from './icons/SearchIcon.svg?react';
+import LoadingIcon from './icons/LoadingIcon.svg?react';
 
 // Helper function to extract quote URL from various field names
 function getQuoteUrl(data) {
@@ -718,17 +720,9 @@ function App() {
               title={loading ? 'Loading...' : 'Show'}
             >
               {loading ? (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="loading-spinner">
-                  <circle cx="12" cy="12" r="10" strokeDasharray="31.416" strokeDashoffset="31.416">
-                    <animate attributeName="stroke-dasharray" dur="2s" values="0 31.416;15.708 15.708;0 31.416;0 31.416" repeatCount="indefinite"/>
-                    <animate attributeName="stroke-dashoffset" dur="2s" values="0;-15.708;-31.416;-31.416" repeatCount="indefinite"/>
-                  </circle>
-                </svg>
+                <LoadingIcon />
               ) : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8"></circle>
-                  <path d="m21 21-4.35-4.35"></path>
-                </svg>
+                <SearchIcon />
               )}
             </button>
           </div>

@@ -147,18 +147,19 @@ section {
   justify-content: center;
   font-size: 1rem;
   font-weight: 600;
-  @include neu-outset;
-  color: $color-text;
   border: none;
   border-radius: $border-radius;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
 
-  svg {
+  .icon {
     stroke: $color-primary;
   }
 
+  &:not(:disabled) {
+    @include neu-outset;
+  }
 
   &:hover:not(:disabled) {
     @include neu-inset;
@@ -173,7 +174,7 @@ section {
     opacity: 0.5;
     cursor: not-allowed;
 
-    svg {
+    .icon {
       stroke: $color-secondary;
     }
   }
@@ -675,11 +676,12 @@ section {
   }
 
   .run-button {
-    @include neu-outset-dark;
-    color: #e0e0e0;
-
-    svg {
+    .icon {
       stroke: #6bb3ff;
+    }
+
+    &:not(:disabled) {
+      @include neu-outset-dark;
     }
 
     &:hover:not(:disabled) {
@@ -694,7 +696,7 @@ section {
       @include neu-inset-dark;
       opacity: 0.5;
 
-      svg {
+      .icon {
         stroke: #6c757d;
       }
     }
