@@ -24,6 +24,15 @@ function getQuoteUrl(data) {
   return data.quoteUrl || data.quote || data.quoteUri || data._misskey_quote || null;
 }
 
+// Helper function to extract content from various field names (including Misskey)
+function getContent(data) {
+  if (!data || typeof data !== 'object') return null;
+  // Try content, _misskey_content, or source.content
+  const content = data.content || data._misskey_content || (data.source && data.source.content) || null;
+  // Return content if it's a non-empty string
+  return (typeof content === 'string' && content.trim()) ? content : null;
+}
+
 // UserHeader component for rendering user info (profile pic, nickname, handle, timestamp)
 function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published, postId, signedMedia = {} }) {
   const iconSignature = icon ? (signedMedia[icon] || null) : null;
@@ -372,8 +381,8 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
           </button>
         </div>
       )}
-      {shouldShowContent && quoteData.content && (
-        <div dangerouslySetInnerHTML={{ __html: quoteData.content }} />
+      {shouldShowContent && getContent(quoteData) && (
+        <div dangerouslySetInnerHTML={{ __html: getContent(quoteData) }} />
       )}
       {shouldShowContent && quoteData.attachment && Array.isArray(quoteData.attachment) && quoteData.attachment.length > 0 && (
         <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -724,7 +733,7 @@ function App() {
           <section className="preview-section">
             {previewData && (
               <>
-                {previewData.content && (
+                {(getContent(previewData) || (previewData.attachment && previewData.attachment.length > 0)) && (
                   <div className="content-html">
                     {(previewData.published || previewData.attributedTo) && (() => {
                       const { handle, nickname, fallback, tags, actorId, icon, signedMedia: actorSignedMedia } = parseAttributedTo();
@@ -763,8 +772,8 @@ function App() {
                         </button>
                       </div>
                     )}
-                    {(!previewData.summary || showContent) && previewData.content && (
-                      <div dangerouslySetInnerHTML={{ __html: previewData.content }} />
+                    {(!previewData.summary || showContent) && getContent(previewData) && (
+                      <div dangerouslySetInnerHTML={{ __html: getContent(previewData) }} />
                     )}
                     {(!previewData.summary || showContent) && previewData.attachment && Array.isArray(previewData.attachment) && previewData.attachment.length > 0 && (() => {
                       return (
@@ -842,7 +851,7 @@ function App() {
                     )}
                   </div>
                 )}
-                {!previewData.content && getQuoteUrl(previewData) && (
+                {!getContent(previewData) && getQuoteUrl(previewData) && (
                   <div className="content-html">
                     {previewData.summary && (
                       <div style={{ marginBottom: '0.5rem', padding: '0.5rem', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '4px', fontSize: '0.9rem' }}>

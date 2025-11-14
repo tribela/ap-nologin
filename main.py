@@ -8,9 +8,9 @@ from urllib.parse import urlparse
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="AP NoLogin", description="View ActivityPub notes without login")
 
@@ -484,7 +484,7 @@ async def proxy_media(
         # Manually enter the stream context to keep it open
         stream_context = client.stream('GET', media_url)
         response = await stream_context.__aenter__()
-        
+
         # Read status line and headers
         await response.aread()
         response.raise_for_status()
