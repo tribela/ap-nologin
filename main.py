@@ -33,7 +33,9 @@ def verify_media_signature(url, signature):
 # API routes
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "message": "Server is running"})
+    response = jsonify({"status": "ok", "message": "Server is running"})
+    response.headers['Cache-Control'] = 'public, max-age=60'  # Cache for 1 minute
+    return response
 
 
 @app.route("/api/activity", methods=["GET"])
@@ -234,7 +236,9 @@ def webfinger():
                 }
                 if signed_media:
                     result["_signed_media"] = signed_media
-                return jsonify(result)
+                response = jsonify(result)
+                response.headers['Cache-Control'] = 'public, max-age=300'  # Cache for 5 minutes
+                return response
 
             # Otherwise, try webfinger lookup
             if resource.startswith('acct:'):
@@ -310,7 +314,9 @@ def webfinger():
                 }
                 if signed_media:
                     result["_signed_media"] = signed_media
-                return jsonify(result)
+                response = jsonify(result)
+                response.headers['Cache-Control'] = 'public, max-age=300'  # Cache for 5 minutes
+                return response
             except httpx.HTTPError:
                 # If webfinger fails, try to use resource as direct actor URL
                 if resource.startswith('http://') or resource.startswith('https://'):
@@ -442,8 +448,12 @@ def proxy_media():
                 if content_type:
                     return jsonify({"error": "Invalid content type"}), 400
 
-            # Return the media with appropriate content type
-            return response.content, 200, {"Content-Type": content_type or "application/octet-stream"}
+            # Return the media with appropriate content type and cache headers
+            headers = {
+                "Content-Type": content_type or "application/octet-stream",
+                "Cache-Control": "public, max-age=3600"  # Cache for 1 hour
+            }
+            return response.content, 200, headers
 
     except httpx.HTTPError as e:
         return jsonify({"error": f"Failed to fetch media: {str(e)}"}), 500
