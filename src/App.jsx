@@ -112,6 +112,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
       setLoading(true);
       setErrorStatus(null);
       setQuoteData(null);
+      setShowSensitiveMedia({});
       try {
         const response = await fetch(`/api/activity?url=${encodeURIComponent(quoteUrl)}`, {
           method: 'GET',
@@ -516,6 +517,7 @@ function App() {
     setPreview('');
     setPreviewData(null);
     setPreviewSignedMedia({});
+    setShowSensitiveMedia({});
 
     try {
       const response = await fetch(`/api/activity?url=${encodeURIComponent(url.trim())}`, {
