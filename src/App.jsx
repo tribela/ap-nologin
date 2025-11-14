@@ -1,13 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
+// Helper function to proxy media URLs through backend
+function getMediaUrl(url) {
+  if (!url) return null;
+  // If already a relative URL or data URL, return as is
+  if (url.startsWith('/') || url.startsWith('data:')) {
+    return url;
+  }
+  // Proxy through backend
+  return `/api/media?url=${encodeURIComponent(url)}`;
+}
+
 // UserHeader component for rendering user info (profile pic, nickname, handle, timestamp)
 function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published, postId }) {
   return (
     <div style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem', justifyContent: 'space-between', alignItems: 'flex-start' }}>
       <div style={{ display: 'flex', gap: '0.5rem', flex: 1 }}>
         {icon && (
-          <img src={icon} alt="Profile" style={{ width: '2.5em', height: '2.5em', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+          <img src={getMediaUrl(icon)} alt="Profile" style={{ width: '2.5em', height: '2.5em', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
         )}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: '0.9rem' }}>
@@ -84,7 +95,7 @@ function renderNicknameWithEmojis(nickname, tags = []) {
       parts.push(
         <img
           key={match.index}
-          src={emojiMap[emojiName]}
+          src={getMediaUrl(emojiMap[emojiName])}
           alt={emojiName}
           style={{ width: '1em', height: '1em', verticalAlign: 'middle', margin: '0 0.1em' }}
         />
@@ -344,9 +355,21 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
       {shouldShowContent && quoteData.attachment && Array.isArray(quoteData.attachment) && quoteData.attachment.length > 0 && (
         <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
           {quoteData.attachment.map((att, idx) => {
-            const url = att.url || (typeof att === 'string' ? att : null);
-            const mediaType = att.mediaType || att.type || '';
-            const name = att.name || att.summary || '';
+            let url = null;
+            if (typeof att === 'string') {
+              url = att;
+            } else if (att && typeof att === 'object') {
+              // Handle nested URL structure
+              if (typeof att.url === 'string') {
+                url = att.url;
+              } else if (att.url && typeof att.url === 'object' && att.url.href) {
+                url = att.url.href;
+              } else if (att.href) {
+                url = att.href;
+              }
+            }
+            const mediaType = att.mediaType || (att && att.type) || '';
+            const name = (att && att.name) || (att && att.summary) || '';
             
             if (!url) return null;
             
@@ -354,7 +377,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
               return (
                 <img
                   key={idx}
-                  src={url}
+                  src={getMediaUrl(url)}
                   alt={name}
                   onClick={() => setFullscreenMedia({ type: 'image', url, name })}
                   style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain', cursor: 'pointer' }}
@@ -364,7 +387,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
               return (
                 <video
                   key={idx}
-                  src={url}
+                  src={getMediaUrl(url)}
                   controls
                   onClick={() => setFullscreenMedia({ type: 'video', url, name })}
                   style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', cursor: 'pointer' }}
@@ -376,7 +399,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
               return (
                 <audio
                   key={idx}
-                  src={url}
+                  src={getMediaUrl(url)}
                   controls
                   style={{ width: '100%', maxWidth: '500px' }}
                 >
@@ -422,14 +445,14 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
       >
         {fullscreenMedia.type === 'image' ? (
           <img
-            src={fullscreenMedia.url}
+            src={getMediaUrl(fullscreenMedia.url)}
             alt={fullscreenMedia.name || ''}
             onClick={(e) => e.stopPropagation()}
             style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain' }}
           />
         ) : (
           <video
-            src={fullscreenMedia.url}
+            src={getMediaUrl(fullscreenMedia.url)}
             controls
             autoPlay
             onClick={(e) => e.stopPropagation()}
@@ -698,9 +721,21 @@ function App() {
                     {(!previewData.summary || showContent) && previewData.attachment && Array.isArray(previewData.attachment) && previewData.attachment.length > 0 && (
                       <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                         {previewData.attachment.map((att, idx) => {
-                          const url = att.url || (typeof att === 'string' ? att : null);
-                          const mediaType = att.mediaType || att.type || '';
-                          const name = att.name || att.summary || '';
+                          let url = null;
+                          if (typeof att === 'string') {
+                            url = att;
+                          } else if (att && typeof att === 'object') {
+                            // Handle nested URL structure
+                            if (typeof att.url === 'string') {
+                              url = att.url;
+                            } else if (att.url && typeof att.url === 'object' && att.url.href) {
+                              url = att.url.href;
+                            } else if (att.href) {
+                              url = att.href;
+                            }
+                          }
+                          const mediaType = att.mediaType || (att && att.type) || '';
+                          const name = (att && att.name) || (att && att.summary) || '';
                           
                           if (!url) return null;
                           
@@ -708,7 +743,7 @@ function App() {
                             return (
                               <img
                                 key={idx}
-                                src={url}
+                                src={getMediaUrl(url)}
                                 alt={name}
                                 onClick={() => setFullscreenMedia({ type: 'image', url, name })}
                                 style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain', cursor: 'pointer' }}
@@ -718,7 +753,7 @@ function App() {
                             return (
                               <video
                                 key={idx}
-                                src={url}
+                                src={getMediaUrl(url)}
                                 controls
                                 onClick={() => setFullscreenMedia({ type: 'video', url, name })}
                                 style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', cursor: 'pointer' }}
@@ -730,7 +765,7 @@ function App() {
                             return (
                               <audio
                                 key={idx}
-                                src={url}
+                                src={getMediaUrl(url)}
                                 controls
                                 style={{ width: '100%', maxWidth: '500px' }}
                               >
@@ -828,14 +863,14 @@ function App() {
         >
           {fullscreenMedia.type === 'image' ? (
             <img
-              src={fullscreenMedia.url}
+              src={getMediaUrl(fullscreenMedia.url)}
               alt={fullscreenMedia.name || ''}
               onClick={(e) => e.stopPropagation()}
               style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain' }}
             />
           ) : (
             <video
-              src={fullscreenMedia.url}
+              src={getMediaUrl(fullscreenMedia.url)}
               controls
               autoPlay
               onClick={(e) => e.stopPropagation()}

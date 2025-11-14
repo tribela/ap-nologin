@@ -243,5 +243,30 @@ def main():
     app.run(debug=True, use_reloader=True, host="0.0.0.0", port=5000)
 
 
+@app.route("/api/media", methods=["GET"])
+def proxy_media():
+    try:
+        media_url = request.args.get('url', '').strip()
+        if not media_url:
+            return jsonify({"error": "URL parameter is required"}), 400
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; MSK-NoLogin/1.0)"
+        }
+
+        with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+            response = client.get(media_url, headers=headers)
+            response.raise_for_status()
+
+            # Return the media with appropriate content type
+            content_type = response.headers.get("content-type", "application/octet-stream")
+            return response.content, 200, {"Content-Type": content_type}
+
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to fetch media: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
 if __name__ == "__main__":
     main()
