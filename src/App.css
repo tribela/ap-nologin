@@ -4,6 +4,10 @@
   flex-direction: column;
   align-items: center;
   padding: 2rem;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .App-header {
@@ -23,6 +27,7 @@
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  box-sizing: border-box;
 }
 
 section {
@@ -30,6 +35,10 @@ section {
   padding: 2rem;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  overflow-x: hidden;
 }
 
 .input-section {
@@ -183,10 +192,23 @@ section {
   border-radius: 4px;
   border: 1px solid #ddd;
   line-height: 1.6;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 .content-html p {
   margin: 0.5rem 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+.content-html * {
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .content-html p:first-child {
@@ -232,6 +254,8 @@ section {
 @media (max-width: 768px) {
   .App {
     padding: 1rem;
+    width: 100%;
+    max-width: 100%;
   }
 
   .App-header {
@@ -273,11 +297,26 @@ section {
     border-left-width: 3px;
     margin: 0.75rem 0;
   }
+
+  .user-header {
+    flex-wrap: wrap;
+  }
+
+  .user-header-date {
+    font-size: 0.8rem;
+    white-space: normal;
+  }
 }
 
 @media (max-width: 480px) {
   .App {
     padding: 0.5rem;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .App-header {
+    margin-bottom: 1rem;
   }
 
   .App-header h1 {
@@ -297,6 +336,10 @@ section {
     padding: 0.625rem 1rem;
     font-size: 0.9rem;
   }
+
+  .content-html {
+    padding: 0.5rem;
+  }
 }
 
 /* UserHeader responsive styles */
@@ -306,6 +349,24 @@ section {
   gap: 0.5rem;
   justify-content: space-between;
   align-items: flex-start;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+
+.user-header-avatar {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+  flex-shrink: 0;
+  display: block;
+  aspect-ratio: 1 / 1;
 }
 
 .user-header-content {
@@ -313,6 +374,8 @@ section {
   gap: 0.5rem;
   flex: 1;
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .user-header-info {
@@ -320,12 +383,28 @@ section {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .user-header-date {
   font-size: 0.85rem;
   opacity: 0.7;
   flex-shrink: 0;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.user-header .handle {
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+.user-header .nickname {
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 @media (max-width: 480px) {
@@ -337,6 +416,8 @@ section {
   .user-header-date {
     font-size: 0.75rem;
     align-self: flex-start;
+    white-space: normal;
+    word-break: break-all;
   }
 
   /* Ensure media elements don't overflow on small screens */
@@ -344,5 +425,9 @@ section {
   .content-html video {
     max-width: 100% !important;
     height: auto !important;
+  }
+
+  .user-header-content {
+    width: 100%;
   }
 }

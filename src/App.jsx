@@ -61,10 +61,16 @@ function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published
     <div className="user-header">
       <div className="user-header-content">
         {icon && (
-          <img src={getMediaUrl(icon, iconSignature)} alt="Profile" style={{ width: '2.5em', height: '2.5em', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+          <img
+            src={getMediaUrl(icon, iconSignature)}
+            alt="Profile"
+            className="user-header-avatar"
+            width="40"
+            height="40"
+          />
         )}
         <div className="user-header-info">
-          <div style={{ fontSize: '0.9rem' }}>
+          <div style={{ fontSize: '0.9rem', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
             {renderNicknameWithEmojis(nickname, tags, signedMedia)}
           </div>
           {handle && (
@@ -423,9 +429,9 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
             }
             const mediaType = att.mediaType || (att && att.type) || '';
             const name = (att && att.name) || (att && att.summary) || '';
-            
+
             if (!url) return null;
-            
+
             const signature = signedMedia[url] || null;
             if (mediaType.startsWith('image/')) {
               return (
