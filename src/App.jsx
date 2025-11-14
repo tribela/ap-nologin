@@ -1,21 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-
-// Helper function to proxy media URLs through backend
-// Note: HMAC signature should be generated server-side when processing ActivityPub objects
-function getMediaUrl(url, signature = null) {
-  if (!url) return null;
-  // If already a relative URL or data URL, return as is
-  if (url.startsWith('/') || url.startsWith('data:')) {
-    return url;
-  }
-  // Proxy through backend
-  let proxyUrl = `/api/media?url=${encodeURIComponent(url)}`;
-  if (signature) {
-    proxyUrl += `&sig=${encodeURIComponent(signature)}`;
-  }
-  return proxyUrl;
-}
+import { getMediaUrl, renderHtmlWithEmojis, renderNicknameWithEmojis } from './utils/emojiUtils';
 
 // Helper function to extract quote URL from various field names
 function getQuoteUrl(data) {
@@ -106,66 +91,6 @@ function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published
   );
 }
 
-// Function to render nickname with custom emojis
-function renderNicknameWithEmojis(nickname, tags = [], signedMedia = {}) {
-  if (!nickname) {
-    return null;
-  }
-
-  // Create a map of emoji names to URLs
-  const emojiMap = {};
-  if (Array.isArray(tags)) {
-    tags.forEach((tag) => {
-      if (tag.type === 'Emoji' && tag.name && tag.icon && tag.icon.url) {
-        emojiMap[tag.name] = tag.icon.url;
-      }
-    });
-  }
-
-  // If no emojis, return plain text
-  if (Object.keys(emojiMap).length === 0) {
-    return <span className="nickname">{nickname}</span>;
-  }
-
-  // Replace emoji patterns with images
-  const parts = [];
-  let lastIndex = 0;
-  const emojiPattern = /:([a-zA-Z0-9_]+):/g;
-  let match;
-
-  while ((match = emojiPattern.exec(nickname)) !== null) {
-    // Add text before the emoji
-    if (match.index > lastIndex) {
-      parts.push(nickname.substring(lastIndex, match.index));
-    }
-
-    const emojiName = `:${match[1]}:`;
-    if (emojiMap[emojiName]) {
-      const emojiUrl = emojiMap[emojiName];
-      const emojiSignature = signedMedia[emojiUrl] || null;
-      parts.push(
-        <img
-          key={match.index}
-          src={getMediaUrl(emojiUrl, emojiSignature)}
-          alt={emojiName}
-          style={{ width: '1em', height: '1em', verticalAlign: 'middle', margin: '0 0.1em' }}
-        />
-      );
-    } else {
-      // Emoji not found, keep the text
-      parts.push(emojiName);
-    }
-
-    lastIndex = match.index + match[0].length;
-  }
-
-  // Add remaining text
-  if (lastIndex < nickname.length) {
-    parts.push(nickname.substring(lastIndex));
-  }
-
-  return <span className="nickname">{parts.length > 0 ? parts : nickname}</span>;
-}
 
 // QuoteObject component for recursive rendering
 function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
@@ -409,7 +334,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
         </div>
       )}
       {shouldShowContent && getContent(quoteData) && (
-        <div dangerouslySetInnerHTML={{ __html: getContent(quoteData) }} />
+        <div>{renderHtmlWithEmojis(getContent(quoteData), quoteData.tag || [], signedMedia)}</div>
       )}
       {shouldShowContent && quoteData.attachment && Array.isArray(quoteData.attachment) && quoteData.attachment.length > 0 && (
         <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -800,7 +725,7 @@ function App() {
                       </div>
                     )}
                     {(!previewData.summary || showContent) && getContent(previewData) && (
-                      <div dangerouslySetInnerHTML={{ __html: getContent(previewData) }} />
+                      <div>{renderHtmlWithEmojis(getContent(previewData), previewData.tag || [], previewSignedMedia)}</div>
                     )}
                     {(!previewData.summary || showContent) && previewData.attachment && Array.isArray(previewData.attachment) && previewData.attachment.length > 0 && (() => {
                       return (
