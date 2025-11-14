@@ -566,6 +566,18 @@ function App() {
     }
   };
 
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const droppedText = e.dataTransfer.getData('text/plain');
+    if (droppedText) {
+      setUrl(droppedText.trim());
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape' && fullscreenMedia) {
@@ -692,6 +704,8 @@ function App() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onKeyPress={handleKeyPress}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
               disabled={loading}
             />
             <button
