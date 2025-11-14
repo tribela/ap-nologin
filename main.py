@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import ipaddress
 import os
+import secrets
 from urllib.parse import urlparse
 
 import httpx
@@ -14,8 +15,12 @@ app = Flask(__name__, static_folder='dist', static_url_path='')
 CORS(app)
 
 # HMAC secret key for signing media URLs
-# In production, use environment variable or secure key management
-MEDIA_HMAC_SECRET = os.environ.get('MEDIA_HMAC_SECRET', 'change-me-in-production').encode('utf-8')
+# Use environment variable if set, otherwise generate a random secret
+# Note: Random secret will change on each restart, invalidating previous signatures
+media_secret = os.environ.get('MEDIA_HMAC_SECRET')
+if not media_secret:
+    media_secret = secrets.token_urlsafe(32)
+MEDIA_HMAC_SECRET = media_secret.encode('utf-8')
 
 
 def sign_media_url(url):
