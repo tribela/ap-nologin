@@ -1,7 +1,7 @@
 [project]
-name = "msk-nologin"
+name = "ap-nologin"
 version = "0.1.0"
-description = "Add your description here"
+description = "View AP note without login"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
