@@ -3,6 +3,8 @@ import './App.scss';
 import { getMediaUrl, renderHtmlWithEmojis, renderNicknameWithEmojis } from './utils/emojiUtils';
 import SearchIcon from './icons/SearchIcon.svg?react';
 import LoadingIcon from './icons/LoadingIcon.svg?react';
+import RadioIcon from './icons/RadioIcon.svg?react';
+import CheckboxIcon from './icons/CheckboxIcon.svg?react';
 
 // Helper function to extract quote URL from various field names
 function getQuoteUrl(data) {
@@ -39,6 +41,102 @@ function formatDate(dateString) {
   } catch (e) {
     return dateString; // Return original if formatting fails
   }
+}
+
+// Helper function to extract poll data from ActivityPub object
+function getPollData(data) {
+  if (!data || typeof data !== 'object') return null;
+  // Check for oneOf or anyOf (poll options)
+  const pollOptions = data.oneOf || data.anyOf || null;
+  if (!pollOptions || !Array.isArray(pollOptions) || pollOptions.length === 0) return null;
+  
+  // Determine which field was used
+  const pollType = data.oneOf ? 'oneOf' : (data.anyOf ? 'anyOf' : null);
+  
+  return {
+    options: pollOptions,
+    closed: data.closed || false,
+    endTime: data.endTime || null,
+    voterCount: data.votersCount || null,
+    pollType: pollType
+  };
+}
+
+// Poll component for rendering poll data
+function Poll({ pollData }) {
+  if (!pollData || !pollData.options || !Array.isArray(pollData.options)) {
+    return null;
+  }
+
+  // Calculate total votes
+  const totalVotes = pollData.options.reduce((sum, option) => {
+    const votes = typeof option.replies === 'object' && option.replies !== null
+      ? (option.replies.totalItems || option.replies || 0)
+      : (option.replies || 0);
+    return sum + (typeof votes === 'number' ? votes : 0);
+  }, 0);
+
+  // Check if poll is closed
+  const isClosed = pollData.closed || (pollData.endTime && new Date(pollData.endTime) < new Date());
+
+  return (
+    <div className="poll-container">
+      <div className="poll-header">
+        <strong>Poll</strong>
+        {pollData.pollType && (
+          <span className="poll-type" title={pollData.pollType}>
+            {pollData.pollType === 'oneOf' ? (
+              <RadioIcon className="poll-type-icon" />
+            ) : (
+              <CheckboxIcon className="poll-type-icon" />
+            )}
+          </span>
+        )}
+        {pollData.endTime && (
+          <span className="poll-end-time">
+            {isClosed ? 'Closed' : `Ends: ${formatDate(pollData.endTime)}`}
+          </span>
+        )}
+        {pollData.voterCount !== null && (
+          <span className="poll-voter-count">
+            {pollData.voterCount} {pollData.voterCount === 1 ? 'vote' : 'votes'}
+          </span>
+        )}
+      </div>
+      <div className="poll-options">
+        {pollData.options.map((option, idx) => {
+          const votes = typeof option.replies === 'object' && option.replies !== null
+            ? (option.replies.totalItems || option.replies || 0)
+            : (option.replies || 0);
+          const voteCount = typeof votes === 'number' ? votes : 0;
+          const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
+          const optionName = option.name || option.content || `Option ${idx + 1}`;
+
+          return (
+            <div key={idx} className="poll-option">
+              <div className="poll-option-header">
+                <span className="poll-option-name">{optionName}</span>
+                <span className="poll-option-stats">
+                  {voteCount} ({percentage}%)
+                </span>
+              </div>
+              <div className="poll-option-bar-container">
+                <div 
+                  className="poll-option-bar" 
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {totalVotes > 0 && (
+        <div className="poll-footer">
+          <span className="poll-total-votes">{totalVotes} total {totalVotes === 1 ? 'vote' : 'votes'}</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // UserHeader component for rendering user info (profile pic, nickname, handle, timestamp)
@@ -439,6 +537,10 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
           })}
         </div>
       )}
+      {shouldShowContent && (() => {
+        const pollData = getPollData(quoteData);
+        return pollData ? <Poll pollData={pollData} /> : null;
+      })()}
       {shouldShowContent && getQuoteUrl(quoteData) && (
         <QuoteObject quoteUrl={getQuoteUrl(quoteData)} depth={depth + 1} maxDepth={maxDepth} />
       )}
@@ -867,6 +969,10 @@ function App() {
                         </div>
                       );
                     })()}
+                    {(!previewData.summary || showContent) && (() => {
+                      const pollData = getPollData(previewData);
+                      return pollData ? <Poll pollData={pollData} /> : null;
+                    })()}
                     {(!previewData.summary || showContent) && getQuoteUrl(previewData) && (
                       <QuoteObject quoteUrl={getQuoteUrl(previewData)} depth={0} maxDepth={3} />
                     )}
@@ -884,6 +990,10 @@ function App() {
                         </button>
                       </div>
                     )}
+                    {(!previewData.summary || showContent) && (() => {
+                      const pollData = getPollData(previewData);
+                      return pollData ? <Poll pollData={pollData} /> : null;
+                    })()}
                     {(!previewData.summary || showContent) && (
                       <QuoteObject quoteUrl={getQuoteUrl(previewData)} depth={0} maxDepth={3} />
                     )}
