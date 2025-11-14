@@ -196,3 +196,115 @@ section {
 .content-html p:last-child {
   margin-bottom: 0;
 }
+
+/* Responsive styles for small screens */
+@media (max-width: 768px) {
+  .App {
+    padding: 1rem;
+  }
+
+  .App-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .App-header h1 {
+    font-size: 1.75rem;
+  }
+
+  .App-main {
+    gap: 1rem;
+  }
+
+  section {
+    padding: 1rem;
+  }
+
+  .input-group {
+    flex-direction: column;
+  }
+
+  .run-button {
+    width: 100%;
+  }
+
+  .preview-content {
+    padding: 1rem;
+    font-size: 0.8rem;
+  }
+
+  .content-html {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .App {
+    padding: 0.5rem;
+  }
+
+  .App-header h1 {
+    font-size: 1.5rem;
+  }
+
+  section {
+    padding: 0.75rem;
+  }
+
+  .url-input {
+    font-size: 0.9rem;
+    padding: 0.625rem 0.75rem;
+  }
+
+  .run-button {
+    padding: 0.625rem 1rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* UserHeader responsive styles */
+.user-header {
+  margin-bottom: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.user-header-content {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.user-header-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.user-header-date {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .user-header {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .user-header-date {
+    font-size: 0.75rem;
+    align-self: flex-start;
+  }
+
+  /* Ensure media elements don't overflow on small screens */
+  .content-html img,
+  .content-html video {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+}

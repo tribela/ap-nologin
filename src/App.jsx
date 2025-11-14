@@ -58,17 +58,17 @@ function formatDate(dateString) {
 function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published, postId, signedMedia = {} }) {
   const iconSignature = icon ? (signedMedia[icon] || null) : null;
   return (
-    <div style={{ marginBottom: '0.5rem', display: 'flex', gap: '0.5rem', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-      <div style={{ display: 'flex', gap: '0.5rem', flex: 1 }}>
+    <div className="user-header">
+      <div className="user-header-content">
         {icon && (
           <img src={getMediaUrl(icon, iconSignature)} alt="Profile" style={{ width: '2.5em', height: '2.5em', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
         )}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div className="user-header-info">
           <div style={{ fontSize: '0.9rem' }}>
             {renderNicknameWithEmojis(nickname, tags, signedMedia)}
           </div>
           {handle && (
-            <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
+            <div style={{ fontSize: '0.85rem', opacity: 0.7, wordBreak: 'break-word' }}>
               {actorId ? (
                 <a href={actorId} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
                 <span className="handle">{handle}</span>
@@ -79,14 +79,14 @@ function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published
             </div>
           )}
           {!handle && !nickname && fallback && (
-            <div style={{ fontSize: '0.85rem', opacity: 0.7 }}>
+            <div style={{ fontSize: '0.85rem', opacity: 0.7, wordBreak: 'break-word' }}>
               <span>{fallback}</span>
             </div>
           )}
         </div>
       </div>
       {published && (
-        <div style={{ fontSize: '0.85rem', opacity: 0.7, flexShrink: 0 }}>
+        <div className="user-header-date">
           {postId ? (
             <a href={postId} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
               {formatDate(published)}
