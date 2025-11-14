@@ -257,7 +257,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
   // If max depth exceeded, show simple "quoted content" message
   if (depth >= maxDepth) {
     return (
-      <div className="quote-object" style={{ marginTop: '1rem', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
+      <div className="quote-object content-html" style={{ marginTop: '1rem', padding: '0.5rem' }}>
         <div style={{ fontStyle: 'italic', color: '#666' }}>quoted content</div>
       </div>
     );
@@ -265,7 +265,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
 
   if (loading) {
     return (
-      <div className="quote-object" style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px' }}>
+      <div className="quote-object content-html" style={{ marginTop: '1rem', padding: '1rem' }}>
         <div>Loading quote...</div>
       </div>
     );
@@ -281,7 +281,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
     };
     const color = errorColors[errorStatus.code] || '#d32f2f';
     return (
-      <div className="quote-object" style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
+      <div className="quote-object content-html" style={{ marginTop: '1rem', padding: '1rem' }}>
         <div style={{ color, fontWeight: 'bold' }}>
           {errorStatus.message} ({errorStatus.code})
         </div>
@@ -302,7 +302,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
 
   return (
     <>
-    <div className="content-html" style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
+    <div className="content-html" style={{ marginTop: '1rem', padding: '1rem' }}>
       {(quoteData.published || quoteData.attributedTo) && (
         <UserHeader
           nickname={nickname}
@@ -913,15 +913,8 @@ function App() {
             )}
             <div style={{ marginTop: '1rem' }}>
               <button
+                className="raw-json-button"
                 onClick={() => setShowRawJson(!showRawJson)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#f0f0f0',
-                  border: '1px solid #ddd',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem'
-                }}
               >
                 {showRawJson ? 'Hide' : 'Show'} Raw JSON
               </button>

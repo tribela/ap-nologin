@@ -126,6 +126,20 @@ section {
   }
 }
 
+.raw-json-button {
+  padding: 0.5rem $spacing-md;
+  background-color: #f0f0f0;
+  border: 1px solid $color-border;
+  border-radius: $border-radius;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #e0e0e0;
+  }
+}
+
 .error-message {
   padding: 0.75rem;
   background-color: $color-error-bg;
@@ -554,6 +568,114 @@ section {
 
   .content-body & {
     height: 2em;
+  }
+}
+
+// Dark mode support
+@media (prefers-color-scheme: dark) {
+  .App {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+  }
+
+  .App-header h1 {
+    color: #e0e0e0;
+  }
+
+  section {
+    background: #2d2d2d;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .url-input {
+    background-color: #3a3a3a;
+    border-color: #555;
+    color: #e0e0e0;
+
+    &:focus {
+      border-color: #4a9eff;
+    }
+
+    &:disabled {
+      background-color: #2a2a2a;
+    }
+  }
+
+  .raw-json-button {
+    background-color: #3a3a3a;
+    border-color: #555;
+    color: #e0e0e0;
+
+    &:hover {
+      background-color: #4a4a4a;
+    }
+  }
+
+  .error-message {
+    background-color: #4a1f1f;
+    color: #ff6b6b;
+    border-left-color: #dc3545;
+  }
+
+  .preview-content {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+  }
+
+  .activitypub-info {
+    background-color: #1e2a3a;
+    border-color: #3a4a5a;
+  }
+
+  .activitypub-info h3 {
+    color: #e0e0e0;
+  }
+
+  .info-item {
+    strong {
+      color: #b0b0b0;
+    }
+
+    a {
+      color: #4a9eff;
+
+      &:hover {
+        color: #6bb3ff;
+      }
+    }
+  }
+
+  .content-html {
+    background-color: #2d2d2d !important;
+    border-color: #444 !important;
+    color: #e0e0e0;
+
+    blockquote {
+      border-left-color: #666;
+      background-color: #252525;
+      color: #b0b0b0;
+    }
+  }
+
+  .quote-object {
+    color: #e0e0e0;
+
+    div[style*="color: #666"] {
+      color: #999 !important;
+    }
+  }
+
+  .user-header-date {
+    opacity: 0.8;
+  }
+
+  .sensitive-media-overlay {
+    background-color: rgba(0, 0, 0, 0.3);
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.4);
+    }
   }
 }
 
