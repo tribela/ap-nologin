@@ -162,16 +162,17 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
         handle: fullHandle,
         nickname: actorInfo.nickname || null,
         fallback: null,
-        tags: actorInfo.tag || []
+        tags: actorInfo.tag || [],
+        actorId: actorInfo.id || null
       };
     }
 
     if (!data || !data.attributedTo) {
-      return { handle: null, nickname: null, fallback: null, tags: [] };
+      return { handle: null, nickname: null, fallback: null, tags: [], actorId: null };
     }
 
     if (typeof data.attributedTo === 'string') {
-      return { handle: null, nickname: null, fallback: data.attributedTo, tags: [] };
+      return { handle: null, nickname: null, fallback: data.attributedTo, tags: [], actorId: data.attributedTo };
     }
 
     if (typeof data.attributedTo === 'object' && data.attributedTo !== null) {
@@ -179,6 +180,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
       const nickname = data.attributedTo.name || null;
       const fallback = data.attributedTo.id || JSON.stringify(data.attributedTo);
       const tags = data.attributedTo.tag || [];
+      const actorId = data.attributedTo.id || null;
       // Try to extract domain from id URL
       let domain = '';
       if (data.attributedTo.id) {
@@ -190,10 +192,10 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
         }
       }
       const fullHandle = handle && domain ? `@${handle}@${domain}` : handle ? `@${handle}` : '';
-      return { handle: fullHandle, nickname, fallback, tags };
+      return { handle: fullHandle, nickname, fallback, tags, actorId };
     }
 
-    return { handle: null, nickname: null, fallback: null, tags: [] };
+    return { handle: null, nickname: null, fallback: null, tags: [], actorId: null };
   };
 
   if (!quoteUrl) {
@@ -239,7 +241,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
     return null;
   }
 
-  const { handle, nickname, fallback, tags } = parseAttributedTo(quoteData, quoteActorInfo);
+  const { handle, nickname, fallback, tags, actorId } = parseAttributedTo(quoteData, quoteActorInfo);
 
   return (
     <div className="content-html" style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fefefe' }}>
@@ -249,13 +251,27 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
             <>
               {renderNicknameWithEmojis(nickname, tags)}
               {nickname && handle && ' '}
-              {handle && <span className="handle">{handle}</span>}
+              {handle && (
+                actorId ? (
+                  <a href={actorId} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#0066cc', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
+                    <span className="handle">{handle}</span>
+                  </a>
+                ) : (
+                  <span className="handle">{handle}</span>
+                )
+              )}
               {!handle && !nickname && fallback && <span>{fallback}</span>}
             </>
           )}
           {quoteData.published && quoteData.attributedTo && ' • '}
           {quoteData.published && (
-            <span>{new Date(quoteData.published).toISOString()}</span>
+            quoteData.id ? (
+              <a href={quoteData.id} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#0066cc', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
+                {new Date(quoteData.published).toISOString()}
+              </a>
+            ) : (
+              <span>{new Date(quoteData.published).toISOString()}</span>
+            )
           )}
         </div>
       )}
@@ -386,17 +402,18 @@ function App() {
         handle: fullHandle,
         nickname: actorInfo.nickname || null,
         fallback: null,
-        tags: actorInfo.tag || []
+        tags: actorInfo.tag || [],
+        actorId: actorInfo.id || null
       };
     }
 
     // Fallback to previewData
     if (!previewData || !previewData.attributedTo) {
-      return { handle: null, nickname: null, fallback: null, tags: [] };
+      return { handle: null, nickname: null, fallback: null, tags: [], actorId: null };
     }
 
     if (typeof previewData.attributedTo === 'string') {
-      return { handle: null, nickname: null, fallback: previewData.attributedTo, tags: [] };
+      return { handle: null, nickname: null, fallback: previewData.attributedTo, tags: [], actorId: previewData.attributedTo };
     }
 
     if (typeof previewData.attributedTo === 'object' && previewData.attributedTo !== null) {
@@ -405,6 +422,7 @@ function App() {
       const nickname = previewData.attributedTo.name || null;
       const fallback = previewData.attributedTo.id || JSON.stringify(previewData.attributedTo);
       const tags = previewData.attributedTo.tag || [];
+      const actorId = previewData.attributedTo.id || null;
       // Try to extract domain from id URL
       let domain = '';
       if (previewData.attributedTo.id) {
@@ -416,10 +434,10 @@ function App() {
         }
       }
       const fullHandle = handle && domain ? `@${handle}@${domain}` : handle ? `@${handle}` : '';
-      return { handle: fullHandle, nickname, fallback, tags };
+      return { handle: fullHandle, nickname, fallback, tags, actorId };
     }
 
-    return { handle: null, nickname: null, fallback: null, tags: [] };
+    return { handle: null, nickname: null, fallback: null, tags: [], actorId: null };
   };
 
   return (
@@ -459,20 +477,34 @@ function App() {
                 {previewData.content && (
                   <div className="content-html">
                     {(previewData.published || previewData.attributedTo) && (() => {
-                      const { handle, nickname, fallback, tags } = parseAttributedTo();
+                      const { handle, nickname, fallback, tags, actorId } = parseAttributedTo();
                       return (
                         <div style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#666' }}>
                           {previewData.attributedTo && (
                             <>
                               {renderNicknameWithEmojis(nickname, tags)}
                               {nickname && handle && ' '}
-                              {handle && <span className="handle">{handle}</span>}
+                              {handle && (
+                                actorId ? (
+                                  <a href={actorId} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#0066cc', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
+                                    <span className="handle">{handle}</span>
+                                  </a>
+                                ) : (
+                                  <span className="handle">{handle}</span>
+                                )
+                              )}
                               {!handle && !nickname && fallback && <span>{fallback}</span>}
                             </>
                           )}
                           {previewData.published && previewData.attributedTo && ' • '}
                           {previewData.published && (
-                            <span>{new Date(previewData.published).toISOString()}</span>
+                            previewData.id ? (
+                              <a href={previewData.id} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: '#0066cc', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
+                                {new Date(previewData.published).toISOString()}
+                              </a>
+                            ) : (
+                              <span>{new Date(previewData.published).toISOString()}</span>
+                            )
                           )}
                         </div>
                       );
