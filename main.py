@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 
 import httpx
 from flask import Flask, jsonify, request, send_from_directory
@@ -29,6 +30,24 @@ def process_url():
         }
         with httpx.Client(timeout=10.0, follow_redirects=True) as client:
             response = client.get(url, headers=headers)
+
+            # Check for HTTP error status codes
+            if response.status_code >= 400:
+                error_messages = {
+                    401: "Unauthorized",
+                    404: "Not Found",
+                    410: "Gone",
+                    403: "Forbidden",
+                    500: "Internal Server Error",
+                    502: "Bad Gateway",
+                    503: "Service Unavailable",
+                }
+                error_msg = error_messages.get(
+                    response.status_code,
+                    f"HTTP {response.status_code} Error"
+                )
+                return jsonify({"error": error_msg}), response.status_code
+
             response.raise_for_status()
 
             # Get the final URL after redirects
@@ -58,8 +77,112 @@ def process_url():
                 "content_type": content_type,
                 "status_code": response.status_code
             })
+    except httpx.HTTPStatusError as e:
+        # Handle HTTP status errors that weren't caught above
+        status_code = e.response.status_code
+        error_messages = {
+            401: "Unauthorized",
+            404: "Not Found",
+            410: "Gone",
+            403: "Forbidden",
+            500: "Internal Server Error",
+            502: "Bad Gateway",
+            503: "Service Unavailable",
+        }
+        error_msg = error_messages.get(
+            status_code,
+            f"HTTP {status_code} Error"
+        )
+        return jsonify({"error": error_msg}), status_code
     except httpx.HTTPError as e:
         return jsonify({"error": f"Failed to fetch URL: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+@app.route("/api/webfinger", methods=["GET"])
+def webfinger():
+    try:
+        resource = request.args.get('resource', '').strip()
+        actor_url = request.args.get('actor_url', '').strip()
+
+        if not resource and not actor_url:
+            return jsonify({"error": "resource or actor_url is required"}), 400
+
+        headers = {
+            "Accept": "application/activity+json, application/jrd+json"
+        }
+
+        with httpx.Client(timeout=10.0, follow_redirects=True) as client:
+            # If actor_url is provided, fetch it directly
+            if actor_url:
+                response = client.get(actor_url, headers=headers)
+                response.raise_for_status()
+                actor_data = response.json()
+                return jsonify({
+                    "success": True,
+                    "handle": actor_data.get('preferredUsername', ''),
+                    "nickname": actor_data.get('name', ''),
+                    "id": actor_data.get('id', actor_url)
+                })
+
+            # Otherwise, try webfinger lookup
+            if resource.startswith('acct:'):
+                # Extract username and domain from acct:user@domain
+                acct_parts = resource[5:].split('@')
+                if len(acct_parts) != 2:
+                    return jsonify({"error": "Invalid acct format"}), 400
+                username, domain = acct_parts
+                webfinger_url = f"https://{domain}/.well-known/webfinger?resource={resource}"
+            else:
+                # Assume it's a URL, try to extract domain and do webfinger
+                parsed = urlparse(resource)
+                domain = parsed.netloc or resource
+                webfinger_url = f"https://{domain}/.well-known/webfinger?resource=acct:{resource}"
+
+            # Try webfinger first
+            try:
+                response = client.get(webfinger_url, headers=headers)
+                response.raise_for_status()
+                webfinger_data = response.json()
+
+                # Find the ActivityPub actor URL from webfinger links
+                actor_url = None
+                for link in webfinger_data.get('links', []):
+                    if link.get('type') == 'application/activity+json':
+                        actor_url = link.get('href')
+                        break
+
+                if not actor_url:
+                    return jsonify({"error": "No ActivityPub actor found"}), 404
+
+                # Fetch the actor
+                response = client.get(actor_url, headers=headers)
+                response.raise_for_status()
+                actor_data = response.json()
+
+                return jsonify({
+                    "success": True,
+                    "handle": actor_data.get('preferredUsername', ''),
+                    "nickname": actor_data.get('name', ''),
+                    "id": actor_data.get('id', actor_url)
+                })
+            except httpx.HTTPError:
+                # If webfinger fails, try to use resource as direct actor URL
+                if resource.startswith('http://') or resource.startswith('https://'):
+                    response = client.get(resource, headers=headers)
+                    response.raise_for_status()
+                    actor_data = response.json()
+                    return jsonify({
+                        "success": True,
+                        "handle": actor_data.get('preferredUsername', ''),
+                        "nickname": actor_data.get('name', ''),
+                        "id": actor_data.get('id', resource)
+                    })
+                raise
+
+    except httpx.HTTPError as e:
+        return jsonify({"error": f"Failed to fetch webfinger: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
