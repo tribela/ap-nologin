@@ -84,7 +84,8 @@ def process_url():
             content_type = response.headers.get("content-type", "").lower()
             is_json = (
                 "application/activity+json" in content_type or
-                "application/json" in content_type
+                "application/json" in content_type or
+                "application/ld+json" in content_type
             )
             signed_media = {}
             if is_json:
