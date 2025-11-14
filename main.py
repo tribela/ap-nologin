@@ -35,6 +35,118 @@ def verify_media_signature(url, signature):
     return hmac.compare_digest(expected_signature, signature)
 
 
+# ActivityPub type definitions
+ACTIVITYPUB_TYPES = {
+    'Person', 'Organization', 'Service', 'Group', 'Application',
+    'Note', 'Article', 'Video', 'Audio', 'Image', 'Document',
+    'Create', 'Update', 'Delete', 'Follow', 'Accept', 'Reject',
+    'Like', 'Announce', 'Undo', 'Block', 'Add', 'Remove',
+    'Question', 'Event', 'Place', 'Tombstone', 'OrderedCollection',
+    'OrderedCollectionPage', 'Collection', 'CollectionPage'
+}
+
+
+def is_activitypub_content(content, content_type):
+    """Validate if content is an ActivityPub object"""
+    if not isinstance(content, (dict, list)):
+        return False
+
+    # If content-type explicitly says activity+json, trust it
+    if "application/activity+json" in content_type.lower():
+        return True
+
+    if isinstance(content, dict):
+        # Check for JSON-LD context
+        if '@context' in content:
+            return True
+
+        # Check for ActivityPub type
+        if 'type' in content:
+            type_value = content.get('type')
+            if isinstance(type_value, str):
+                return type_value in ACTIVITYPUB_TYPES
+            elif isinstance(type_value, list):
+                return any(t in ACTIVITYPUB_TYPES for t in type_value if isinstance(t, str))
+
+        # Objects with id might be ActivityPub (lenient check)
+        if 'id' in content:
+            return True
+
+        return False
+
+    elif isinstance(content, list):
+        if len(content) == 0:
+            return False
+        # Check first item for ActivityPub indicators
+        first_item = content[0]
+        if isinstance(first_item, dict):
+            return '@context' in first_item or 'type' in first_item
+        return False
+
+    return False
+
+
+def extract_url_from_media_object(media_obj):
+    """Extract URL from various media object formats"""
+    if isinstance(media_obj, str):
+        return media_obj
+    if isinstance(media_obj, dict):
+        url = media_obj.get('url') or media_obj.get('href')
+        if isinstance(url, dict):
+            return url.get('href')
+        return url
+    return None
+
+
+def sign_media_urls_in_content(content):
+    """Extract and sign media URLs from ActivityPub content"""
+    signed_media = {}
+
+    if not isinstance(content, dict):
+        return signed_media
+
+    # Sign top-level icon (for actor objects)
+    icon = content.get('icon')
+    if icon:
+        icon_url = extract_url_from_media_object(icon)
+        if isinstance(icon_url, str) and icon_url.startswith(('http://', 'https://')):
+            signed_media[icon_url] = sign_media_url(icon_url)
+
+    # Sign icon URLs from attributedTo
+    if 'attributedTo' in content and isinstance(content['attributedTo'], dict):
+        icon = content['attributedTo'].get('icon')
+        if icon:
+            icon_url = extract_url_from_media_object(icon)
+            if isinstance(icon_url, str) and icon_url.startswith(('http://', 'https://')):
+                signed_media[icon_url] = sign_media_url(icon_url)
+
+        # Sign emoji URLs from attributedTo tags
+        for tag in content['attributedTo'].get('tag', []):
+            if isinstance(tag, dict) and tag.get('type') == 'Emoji':
+                emoji_icon = tag.get('icon')
+                if emoji_icon:
+                    emoji_url = extract_url_from_media_object(emoji_icon)
+                    if isinstance(emoji_url, str) and emoji_url.startswith(('http://', 'https://')):
+                        signed_media[emoji_url] = sign_media_url(emoji_url)
+
+    # Sign attachment URLs
+    for att in content.get('attachment', []):
+        att_url = extract_url_from_media_object(att)
+        if isinstance(att_url, str) and att_url.startswith(('http://', 'https://')):
+            signed_media[att_url] = sign_media_url(att_url)
+
+    # Sign emoji URLs from tags
+    for tag in content.get('tag', []):
+        if isinstance(tag, dict) and tag.get('type') == 'Emoji':
+            emoji_icon = tag.get('icon')
+            if emoji_icon:
+                emoji_url = extract_url_from_media_object(emoji_icon)
+                if isinstance(emoji_url, str) and emoji_url.startswith(('http://', 'https://')):
+                    signed_media[emoji_url] = sign_media_url(emoji_url)
+
+    return signed_media
+
+
 # API routes
 @app.route("/api/health", methods=["GET"])
 def health():
@@ -79,70 +191,30 @@ def process_url():
 
             # Get the final URL after redirects
             final_url = str(response.url)
-
-            # Try to parse as JSON if content-type matches
             content_type = response.headers.get("content-type", "").lower()
+
+            # Check if response is JSON
             is_json = (
                 "application/activity+json" in content_type or
                 "application/json" in content_type or
                 "application/ld+json" in content_type
             )
-            signed_media = {}
-            if is_json:
-                try:
-                    content = response.json()
-                    # Add HMAC signatures for media URLs in ActivityPub objects
-                    if isinstance(content, dict):
-                        # Extract and sign icon URLs
-                        if 'attributedTo' in content and isinstance(content['attributedTo'], dict):
-                            icon = content['attributedTo'].get('icon')
-                            if icon:
-                                icon_url = icon.get('url') if isinstance(icon, dict) else icon
-                                if isinstance(icon_url, str) and icon_url.startswith(('http://', 'https://')):
-                                    signed_media[icon_url] = sign_media_url(icon_url)
-                            # Sign emoji URLs from attributedTo tags
-                            attributed_tags = content['attributedTo'].get('tag', [])
-                            if isinstance(attributed_tags, list):
-                                for tag in attributed_tags:
-                                    if isinstance(tag, dict) and tag.get('type') == 'Emoji':
-                                        emoji_icon = tag.get('icon')
-                                        if emoji_icon:
-                                            if isinstance(emoji_icon, dict):
-                                                emoji_url = emoji_icon.get('url')
-                                            else:
-                                                emoji_url = emoji_icon
-                                            if (isinstance(emoji_url, str) and
-                                                    emoji_url.startswith(('http://', 'https://'))):
-                                                signed_media[emoji_url] = sign_media_url(emoji_url)
-                        # Extract and sign attachment URLs
-                        if 'attachment' in content and isinstance(content['attachment'], list):
-                            for att in content['attachment']:
-                                att_url = None
-                                if isinstance(att, str):
-                                    att_url = att
-                                elif isinstance(att, dict):
-                                    att_url = att.get('url') or att.get('href')
-                                    if isinstance(att_url, dict):
-                                        att_url = att_url.get('href')
-                                if att_url and isinstance(att_url, str) and att_url.startswith(('http://', 'https://')):
-                                    signed_media[att_url] = sign_media_url(att_url)
-                        # Extract and sign emoji URLs from tags
-                        if 'tag' in content and isinstance(content['tag'], list):
-                            for tag in content['tag']:
-                                if isinstance(tag, dict) and tag.get('type') == 'Emoji':
-                                    emoji_icon = tag.get('icon')
-                                    if emoji_icon:
-                                        if isinstance(emoji_icon, dict):
-                                            emoji_url = emoji_icon.get('url')
-                                        else:
-                                            emoji_url = emoji_icon
-                                        if (isinstance(emoji_url, str) and
-                                                emoji_url.startswith(('http://', 'https://'))):
-                                            signed_media[emoji_url] = sign_media_url(emoji_url)
-                except Exception:
-                    content = response.text
-            else:
-                content = response.text
+
+            if not is_json:
+                return jsonify({"error": "URL does not appear to be an ActivityPub resource (not JSON)"}), 400
+
+            # Parse JSON content
+            try:
+                content = response.json()
+            except Exception:
+                return jsonify({"error": "URL does not appear to be an ActivityPub resource (invalid JSON)"}), 400
+
+            # Validate ActivityPub content
+            if not is_activitypub_content(content, content_type):
+                return jsonify({"error": "URL does not appear to be an ActivityPub resource"}), 400
+
+            # Sign media URLs
+            signed_media = sign_media_urls_in_content(content) if isinstance(content, dict) else {}
 
             # Return the content with signed_media at top level
             result = {
@@ -203,41 +275,25 @@ def webfinger():
                 response = client.get(actor_url, headers=headers)
                 response.raise_for_status()
                 actor_data = response.json()
+
                 # Extract domain from actor URL
                 parsed = urlparse(actor_url)
                 domain = parsed.netloc or ''
-                # Extract icon URL and sign it
-                icon_url = None
+
+                # Extract icon URL
                 icon = actor_data.get('icon')
-                if isinstance(icon, dict):
-                    icon_url = icon.get('url')
-                elif isinstance(icon, str):
-                    icon_url = icon
-                # Sign icon URL if present
-                signed_media = {}
-                if icon_url and isinstance(icon_url, str) and icon_url.startswith(('http://', 'https://')):
-                    signed_media[icon_url] = sign_media_url(icon_url)
-                # Sign emoji URLs from tags
-                tags = actor_data.get('tag', [])
-                if isinstance(tags, list):
-                    for tag in tags:
-                        if isinstance(tag, dict) and tag.get('type') == 'Emoji':
-                            emoji_icon = tag.get('icon')
-                            if emoji_icon:
-                                if isinstance(emoji_icon, dict):
-                                    emoji_url = emoji_icon.get('url')
-                                else:
-                                    emoji_url = emoji_icon
-                                if (isinstance(emoji_url, str) and
-                                        emoji_url.startswith(('http://', 'https://'))):
-                                    signed_media[emoji_url] = sign_media_url(emoji_url)
+                icon_url = extract_url_from_media_object(icon) if icon else None
+
+                # Sign media URLs
+                signed_media = sign_media_urls_in_content(actor_data)
+
                 result = {
                     "success": True,
                     "handle": actor_data.get('preferredUsername', ''),
                     "nickname": actor_data.get('name', ''),
                     "id": actor_data.get('id', actor_url),
                     "domain": domain,
-                    "tag": tags,
+                    "tag": actor_data.get('tag', []),
                     "icon": icon_url
                 }
                 if signed_media:
@@ -284,38 +340,21 @@ def webfinger():
                 # Extract domain from actor URL
                 parsed = urlparse(actor_url)
                 domain = parsed.netloc or ''
-                # Extract icon URL and sign it
-                icon_url = None
+
+                # Extract icon URL
                 icon = actor_data.get('icon')
-                if isinstance(icon, dict):
-                    icon_url = icon.get('url')
-                elif isinstance(icon, str):
-                    icon_url = icon
-                # Sign icon URL if present
-                signed_media = {}
-                if icon_url and isinstance(icon_url, str) and icon_url.startswith(('http://', 'https://')):
-                    signed_media[icon_url] = sign_media_url(icon_url)
-                # Sign emoji URLs from tags
-                tags = actor_data.get('tag', [])
-                if isinstance(tags, list):
-                    for tag in tags:
-                        if isinstance(tag, dict) and tag.get('type') == 'Emoji':
-                            emoji_icon = tag.get('icon')
-                            if emoji_icon:
-                                if isinstance(emoji_icon, dict):
-                                    emoji_url = emoji_icon.get('url')
-                                else:
-                                    emoji_url = emoji_icon
-                                if (isinstance(emoji_url, str) and
-                                        emoji_url.startswith(('http://', 'https://'))):
-                                    signed_media[emoji_url] = sign_media_url(emoji_url)
+                icon_url = extract_url_from_media_object(icon) if icon else None
+
+                # Sign media URLs
+                signed_media = sign_media_urls_in_content(actor_data)
+
                 result = {
                     "success": True,
                     "handle": actor_data.get('preferredUsername', ''),
                     "nickname": actor_data.get('name', ''),
                     "id": actor_data.get('id', actor_url),
                     "domain": domain,
-                    "tag": tags,
+                    "tag": actor_data.get('tag', []),
                     "icon": icon_url
                 }
                 if signed_media:
@@ -329,41 +368,25 @@ def webfinger():
                     response = client.get(resource, headers=headers)
                     response.raise_for_status()
                     actor_data = response.json()
+
                     # Extract domain from resource URL
                     parsed = urlparse(resource)
                     domain = parsed.netloc or ''
-                    # Extract icon URL and sign it
-                    icon_url = None
+
+                    # Extract icon URL
                     icon = actor_data.get('icon')
-                    if isinstance(icon, dict):
-                        icon_url = icon.get('url')
-                    elif isinstance(icon, str):
-                        icon_url = icon
-                    # Sign icon URL if present
-                    signed_media = {}
-                    if icon_url and isinstance(icon_url, str) and icon_url.startswith(('http://', 'https://')):
-                        signed_media[icon_url] = sign_media_url(icon_url)
-                    # Sign emoji URLs from tags
-                    tags = actor_data.get('tag', [])
-                    if isinstance(tags, list):
-                        for tag in tags:
-                            if isinstance(tag, dict) and tag.get('type') == 'Emoji':
-                                emoji_icon = tag.get('icon')
-                                if emoji_icon:
-                                    if isinstance(emoji_icon, dict):
-                                        emoji_url = emoji_icon.get('url')
-                                    else:
-                                        emoji_url = emoji_icon
-                                    if (isinstance(emoji_url, str) and
-                                            emoji_url.startswith(('http://', 'https://'))):
-                                        signed_media[emoji_url] = sign_media_url(emoji_url)
+                    icon_url = extract_url_from_media_object(icon) if icon else None
+
+                    # Sign media URLs
+                    signed_media = sign_media_urls_in_content(actor_data)
+
                     result = {
                         "success": True,
                         "handle": actor_data.get('preferredUsername', ''),
                         "nickname": actor_data.get('name', ''),
                         "id": actor_data.get('id', resource),
                         "domain": domain,
-                        "tag": tags,
+                        "tag": actor_data.get('tag', []),
                         "icon": icon_url
                     }
                     if signed_media:
