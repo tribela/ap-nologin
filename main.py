@@ -36,11 +36,10 @@ def health():
     return jsonify({"status": "ok", "message": "Server is running"})
 
 
-@app.route("/api/process", methods=["POST"])
+@app.route("/api/activity", methods=["GET"])
 def process_url():
     try:
-        data = request.get_json()
-        url = data.get('url', '').strip()
+        url = request.args.get('url', '').strip()
 
         if not url:
             return jsonify({"error": "URL is required"}), 400
@@ -149,7 +148,11 @@ def process_url():
             }
             if signed_media:
                 result["_signed_media"] = signed_media
-            return jsonify(result)
+
+            # Add cache headers for reverse proxy caching
+            response_obj = jsonify(result)
+            response_obj.headers['Cache-Control'] = 'public, max-age=300'  # Cache for 5 minutes
+            return response_obj
     except httpx.HTTPStatusError as e:
         # Handle HTTP status errors that weren't caught above
         status_code = e.response.status_code

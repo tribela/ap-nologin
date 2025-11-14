@@ -144,12 +144,8 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
       setErrorStatus(null);
       setQuoteData(null);
       try {
-        const response = await fetch('/api/process', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ url: quoteUrl }),
+        const response = await fetch(`/api/activity?url=${encodeURIComponent(quoteUrl)}`, {
+          method: 'GET',
         });
 
         // Check for HTTP error status codes
@@ -512,12 +508,8 @@ function App() {
     setPreviewSignedMedia({});
 
     try {
-      const response = await fetch('/api/process', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: url.trim() }),
+      const response = await fetch(`/api/activity?url=${encodeURIComponent(url.trim())}`, {
+        method: 'GET',
       });
 
       const data = await response.json();
