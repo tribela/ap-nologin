@@ -453,6 +453,16 @@ section {
       height: auto !important;
     }
   }
+
+  .custom-emoji {
+    height: 0.8em !important;
+    max-height: 0.8em !important;
+
+    .content-body & {
+      height: 1.5em !important;
+      max-height: 1.5em !important;
+    }
+  }
 }
 
 // UserHeader styles
@@ -622,11 +632,15 @@ section {
 // Custom emoji styles
 .custom-emoji {
   height: 1em;
+  max-height: 1em;
+  width: auto;
   vertical-align: middle;
   margin: 0 0.1em;
+  display: inline-block;
 
   .content-body & {
     height: 2em;
+    max-height: 2em;
   }
 }
 
