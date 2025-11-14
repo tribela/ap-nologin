@@ -330,6 +330,7 @@ function App() {
   const [actorInfo, setActorInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showRawJson, setShowRawJson] = useState(false);
 
   const handleRun = async () => {
     if (!url.trim()) {
@@ -520,7 +521,6 @@ function App() {
 
         {preview && (
           <section className="preview-section">
-            <h2>Preview</h2>
             {previewData && (
               <>
                 {previewData.content && (
@@ -553,8 +553,25 @@ function App() {
                 )}
               </>
             )}
-            <div className="preview-content">
-              <pre>{preview}</pre>
+            <div style={{ marginTop: '1rem' }}>
+              <button
+                onClick={() => setShowRawJson(!showRawJson)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#f0f0f0',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem'
+                }}
+              >
+                {showRawJson ? 'Hide' : 'Show'} Raw JSON
+              </button>
+              {showRawJson && (
+                <div className="preview-content" style={{ marginTop: '0.5rem' }}>
+                  <pre>{preview}</pre>
+                </div>
+              )}
             </div>
           </section>
         )}
