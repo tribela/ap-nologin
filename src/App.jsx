@@ -33,6 +33,27 @@ function getContent(data) {
   return (typeof content === 'string' && content.trim()) ? content : null;
 }
 
+// Helper function to format date as YYYY-mm-DD HH:MM:SS
+function formatDate(dateString) {
+  if (!dateString) return null;
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString; // Invalid date, return original
+
+    // Format: YYYY-mm-DD HH:MM:SS
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  } catch (e) {
+    return dateString; // Return original if formatting fails
+  }
+}
+
 // UserHeader component for rendering user info (profile pic, nickname, handle, timestamp)
 function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published, postId, signedMedia = {} }) {
   const iconSignature = icon ? (signedMedia[icon] || null) : null;
@@ -68,10 +89,10 @@ function UserHeader({ nickname, handle, fallback, tags, actorId, icon, published
         <div style={{ fontSize: '0.85rem', opacity: 0.7, flexShrink: 0 }}>
           {postId ? (
             <a href={postId} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit', cursor: 'pointer' }} onMouseEnter={(e) => e.target.style.textDecoration = 'underline'} onMouseLeave={(e) => e.target.style.textDecoration = 'none'}>
-              {new Date(published).toISOString()}
+              {formatDate(published)}
             </a>
           ) : (
-            <span>{new Date(published).toISOString()}</span>
+            <span>{formatDate(published)}</span>
           )}
         </div>
       )}
