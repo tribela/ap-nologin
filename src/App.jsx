@@ -100,6 +100,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
   const [loading, setLoading] = useState(false);
   const [errorStatus, setErrorStatus] = useState(null);
   const [showContent, setShowContent] = useState(false);
+  const [showSensitiveMedia, setShowSensitiveMedia] = useState({});
   const [fullscreenMedia, setFullscreenMedia] = useState(null);
 
   useEffect(() => {
@@ -336,7 +337,7 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
       {shouldShowContent && getContent(quoteData) && (
         <div>{renderHtmlWithEmojis(getContent(quoteData), quoteData.tag || [], signedMedia)}</div>
       )}
-      {shouldShowContent && quoteData.attachment && Array.isArray(quoteData.attachment) && quoteData.attachment.length > 0 && (
+      {quoteData.attachment && Array.isArray(quoteData.attachment) && quoteData.attachment.length > 0 && (
         <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
           {quoteData.attachment.map((att, idx) => {
             let url = null;
@@ -354,56 +355,123 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
             }
             const mediaType = att.mediaType || (att && att.type) || '';
             const name = (att && att.name) || (att && att.summary) || '';
+            const isSensitive = att && typeof att === 'object' && (att.sensitive === true || att.sensitive === 'true');
 
             if (!url) return null;
 
+            // Skip sensitive attachments if content is hidden (only if there's a CW or if showContent is false)
+            if (isSensitive && !shouldShowContent) return null;
+
             const signature = signedMedia[url] || null;
-            if (mediaType.startsWith('image/')) {
+            const mediaElement = (() => {
+              if (mediaType.startsWith('image/')) {
+                return (
+                  <img
+                    key={idx}
+                    src={getMediaUrl(url, signature)}
+                    alt={name}
+                    onClick={() => setFullscreenMedia({ type: 'image', url, name, signature })}
+                    style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain', cursor: 'pointer' }}
+                  />
+                );
+              } else if (mediaType.startsWith('video/')) {
+                return (
+                  <video
+                    key={idx}
+                    src={getMediaUrl(url, signature)}
+                    controls
+                    onClick={() => setFullscreenMedia({ type: 'video', url, name, signature })}
+                    style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', cursor: 'pointer' }}
+                  >
+                    {name && <track kind="captions" />}
+                  </video>
+                );
+              } else if (mediaType.startsWith('audio/')) {
+                return (
+                  <audio
+                    key={idx}
+                    src={getMediaUrl(url, signature)}
+                    controls
+                    style={{ width: '100%', maxWidth: '500px' }}
+                  >
+                    {name || 'Audio playback not supported'}
+                  </audio>
+                );
+              } else {
+                return (
+                  <a
+                    key={idx}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'block', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', textDecoration: 'none', color: '#0066cc' }}
+                  >
+                    {name || url}
+                  </a>
+                );
+              }
+            })();
+
+            if (isSensitive) {
+              const mediaKey = `sensitive-${idx}`;
+              const isMediaShown = showSensitiveMedia[mediaKey] || false;
               return (
-                <img
-                  key={idx}
-                  src={getMediaUrl(url, signature)}
-                  alt={name}
-                  onClick={() => setFullscreenMedia({ type: 'image', url, name, signature })}
-                  style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain', cursor: 'pointer' }}
-                />
-              );
-            } else if (mediaType.startsWith('video/')) {
-              return (
-                <video
-                  key={idx}
-                  src={getMediaUrl(url, signature)}
-                  controls
-                  onClick={() => setFullscreenMedia({ type: 'video', url, name, signature })}
-                  style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', cursor: 'pointer' }}
-                >
-                  {name && <track kind="captions" />}
-                </video>
-              );
-            } else if (mediaType.startsWith('audio/')) {
-              return (
-                <audio
-                  key={idx}
-                  src={getMediaUrl(url, signature)}
-                  controls
-                  style={{ width: '100%', maxWidth: '500px' }}
-                >
-                  {name || 'Audio playback not supported'}
-                </audio>
-              );
-            } else {
-              return (
-                <a
-                  key={idx}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ display: 'block', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', textDecoration: 'none', color: '#0066cc' }}
-                >
-                  {name || url}
-                </a>
+                <div key={idx} style={{ position: 'relative', display: 'block', width: '100%', maxWidth: '100%' }}>
+                  <div style={{
+                    filter: isMediaShown ? 'none' : 'blur(10px)',
+                    transition: 'filter 0.3s ease',
+                    pointerEvents: isMediaShown ? 'auto' : 'none',
+                    userSelect: 'none',
+                    width: '100%',
+                    maxWidth: '100%'
+                  }}>
+                    {mediaElement}
+                  </div>
+                  {!isMediaShown && (
+                    <div
+                      onClick={() => setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: true })}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 10,
+                        backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        userSelect: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '1.2rem',
+                          fontWeight: '500',
+                          color: '#fff',
+                          textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        press to show
+                      </span>
+                    </div>
+                  )}
+                </div>
               );
             }
+
+            return mediaElement;
           })}
         </div>
       )}
@@ -462,6 +530,7 @@ function App() {
   const [error, setError] = useState('');
   const [showRawJson, setShowRawJson] = useState(false);
   const [showContent, setShowContent] = useState(false);
+  const [showSensitiveMedia, setShowSensitiveMedia] = useState({});
   const [fullscreenMedia, setFullscreenMedia] = useState(null);
 
   const handleRun = async () => {
@@ -727,7 +796,8 @@ function App() {
                     {(!previewData.summary || showContent) && getContent(previewData) && (
                       <div>{renderHtmlWithEmojis(getContent(previewData), previewData.tag || [], previewSignedMedia)}</div>
                     )}
-                    {(!previewData.summary || showContent) && previewData.attachment && Array.isArray(previewData.attachment) && previewData.attachment.length > 0 && (() => {
+                    {previewData.attachment && Array.isArray(previewData.attachment) && previewData.attachment.length > 0 && (() => {
+                      const shouldShowAttachments = !previewData.summary || showContent;
                       return (
                         <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                           {previewData.attachment.map((att, idx) => {
@@ -746,54 +816,122 @@ function App() {
                             }
                             const mediaType = att.mediaType || (att && att.type) || '';
                             const name = (att && att.name) || (att && att.summary) || '';
+                            const isSensitive = att && typeof att === 'object' && (att.sensitive === true || att.sensitive === 'true');
                             if (!url) return null;
+
+                            // Skip sensitive attachments if content is hidden
+                            if (isSensitive && !shouldShowAttachments) return null;
+
                             const signature = previewSignedMedia[url] || null;
-                            if (mediaType.startsWith('image/')) {
+                            const mediaElement = (() => {
+                              if (mediaType.startsWith('image/')) {
+                                return (
+                                  <img
+                                    key={idx}
+                                    src={getMediaUrl(url, signature)}
+                                    alt={name}
+                                    onClick={() => setFullscreenMedia({ type: 'image', url, name, signature })}
+                                    style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain', cursor: 'pointer' }}
+                                  />
+                                );
+                              } else if (mediaType.startsWith('video/')) {
+                                return (
+                                  <video
+                                    key={idx}
+                                    src={getMediaUrl(url, signature)}
+                                    controls
+                                    onClick={() => setFullscreenMedia({ type: 'video', url, name, signature })}
+                                    style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', cursor: 'pointer' }}
+                                  >
+                                    {name && <track kind="captions" />}
+                                  </video>
+                                );
+                              } else if (mediaType.startsWith('audio/')) {
+                                return (
+                                  <audio
+                                    key={idx}
+                                    src={getMediaUrl(url, signature)}
+                                    controls
+                                    style={{ width: '100%', maxWidth: '500px' }}
+                                  >
+                                    {name || 'Audio playback not supported'}
+                                  </audio>
+                                );
+                              } else {
+                                return (
+                                  <a
+                                    key={idx}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ display: 'block', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', textDecoration: 'none', color: '#0066cc' }}
+                                  >
+                                    {name || url}
+                                  </a>
+                                );
+                              }
+                            })();
+
+                            if (isSensitive) {
+                              const mediaKey = `sensitive-${idx}`;
+                              const isMediaShown = showSensitiveMedia[mediaKey] || false;
                               return (
-                                <img
-                                  key={idx}
-                                  src={getMediaUrl(url, signature)}
-                                  alt={name}
-                                  onClick={() => setFullscreenMedia({ type: 'image', url, name, signature })}
-                                  style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain', cursor: 'pointer' }}
-                                />
-                              );
-                            } else if (mediaType.startsWith('video/')) {
-                              return (
-                                <video
-                                  key={idx}
-                                  src={getMediaUrl(url, signature)}
-                                  controls
-                                  onClick={() => setFullscreenMedia({ type: 'video', url, name, signature })}
-                                  style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', cursor: 'pointer' }}
-                                >
-                                  {name && <track kind="captions" />}
-                                </video>
-                              );
-                            } else if (mediaType.startsWith('audio/')) {
-                              return (
-                                <audio
-                                  key={idx}
-                                  src={getMediaUrl(url, signature)}
-                                  controls
-                                  style={{ width: '100%', maxWidth: '500px' }}
-                                >
-                                  {name || 'Audio playback not supported'}
-                                </audio>
-                              );
-                            } else {
-                              return (
-                                <a
-                                  key={idx}
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{ display: 'block', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', textDecoration: 'none', color: '#0066cc' }}
-                                >
-                                  {name || url}
-                                </a>
+                                <div key={idx} style={{ position: 'relative', display: 'block', width: '100%', maxWidth: '100%' }}>
+                                  <div style={{
+                                    filter: isMediaShown ? 'none' : 'blur(10px)',
+                                    transition: 'filter 0.3s ease',
+                                    pointerEvents: isMediaShown ? 'auto' : 'none',
+                                    userSelect: 'none',
+                                    width: '100%',
+                                    maxWidth: '100%'
+                                  }}>
+                                    {mediaElement}
+                                  </div>
+                                  {!isMediaShown && (
+                                    <div
+                                      onClick={() => setShowSensitiveMedia({ ...showSensitiveMedia, [mediaKey]: true })}
+                                      style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        width: '100%',
+                                        height: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        zIndex: 10,
+                                        backgroundColor: 'rgba(0, 0, 0, 0.1)',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        userSelect: 'none'
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.2)';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.target.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          fontSize: '1.2rem',
+                                          fontWeight: '500',
+                                          color: '#fff',
+                                          textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
+                                          pointerEvents: 'none'
+                                        }}
+                                      >
+                                        press to show
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
                               );
                             }
+
+                            return mediaElement;
                           })}
                         </div>
                       );
