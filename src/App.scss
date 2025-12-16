@@ -17,8 +17,8 @@ $neu-shadow-dark: #a3b1c6;
 $neu-shadow-dark-light: rgba(255, 255, 255, 0.05);
 $neu-shadow-dark-dark: #0f1115;
 
-$color-primary: #5b9bd5;
-$color-primary-dark: #4a8bc2;
+$color-primary: #2563eb;
+$color-primary-dark: #1d4ed8;
 $color-secondary: #6c757d;
 $color-error: #dc3545;
 $color-error-bg: #fee;
@@ -365,6 +365,17 @@ section {
   * {
     max-width: 100%;
     box-sizing: border-box;
+  }
+
+  a {
+    color: $color-primary;
+    text-decoration: none;
+    word-break: break-all;
+
+    &:hover {
+      text-decoration: underline;
+      color: $color-primary-dark;
+    }
   }
 
   p {
@@ -973,7 +984,7 @@ section {
 
   .run-button {
     .icon {
-      stroke: #6bb3ff;
+      stroke: #60a5fa;
     }
 
     &:not(:disabled) {
@@ -1049,10 +1060,10 @@ section {
     }
 
     a {
-      color: #6bb3ff;
+      color: #60a5fa;
 
       &:hover {
-        color: #8cc5ff;
+        color: #93c5fd;
       }
     }
   }
@@ -1060,6 +1071,14 @@ section {
   .content-html {
     @include neu-inset-dark;
     color: #e0e0e0;
+
+    a {
+      color: #60a5fa;
+
+      &:hover {
+        color: #93c5fd;
+      }
+    }
 
     blockquote {
       @include neu-inset-dark;
@@ -1141,7 +1160,7 @@ section {
   }
 
   .poll-option-bar {
-    background: #6bb3ff;
+    background: #60a5fa;
   }
 
   .poll-footer {
@@ -1168,10 +1187,10 @@ section {
   }
 
   .audience-link {
-    color: #6bb3ff;
+    color: #60a5fa;
 
     &:hover {
-      color: #8cc5ff;
+      color: #93c5fd;
     }
   }
 
@@ -1186,10 +1205,10 @@ section {
   }
 
   .link-preview-link {
-    color: #6bb3ff;
+    color: #60a5fa;
 
     &:hover {
-      color: #8cc5ff;
+      color: #93c5fd;
     }
   }
 
