@@ -379,10 +379,15 @@ function App() {
   };
 
   const handleShare = async () => {
+    // Build share URL - keep URL readable but encode whitespace
+    const baseUrl = window.location.origin + window.location.pathname;
+    const safeUrl = url.trim().replace(/\s/g, '%20');
+    const shareUrl = url.trim() ? `${baseUrl}?url=${safeUrl}` : baseUrl;
+
     if (!navigator.share) {
       // Fallback: copy to clipboard
       try {
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(shareUrl);
         alert('URL copied to clipboard');
       } catch (err) {
         console.error('Failed to copy:', err);
@@ -393,7 +398,7 @@ function App() {
     try {
       await navigator.share({
         title: 'AP NoLogin',
-        url: window.location.href
+        url: shareUrl
       });
     } catch (err) {
       // User cancelled or share failed
