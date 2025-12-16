@@ -280,8 +280,9 @@ function App() {
   const [showSensitiveMedia, setShowSensitiveMedia] = useState({});
   const [fullscreenMedia, setFullscreenMedia] = useState(null);
 
-  const handleRun = async () => {
-    if (!url.trim()) {
+  // Fetch activity data for a given URL
+  const fetchActivity = async (targetUrl) => {
+    if (!targetUrl.trim()) {
       setError('Please enter a URL');
       return;
     }
@@ -294,7 +295,7 @@ function App() {
     setShowSensitiveMedia({});
 
     try {
-      const response = await fetch(`/api/activity?url=${encodeURIComponent(url.trim())}`, {
+      const response = await fetch(`/api/activity?url=${encodeURIComponent(targetUrl.trim())}`, {
         method: 'GET',
       });
 
@@ -331,12 +332,31 @@ function App() {
 
       setPreview(displayPreview);
       setActorInfo(null);
+
+      // Update browser URL with the searched URL
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('url', targetUrl.trim());
+      window.history.replaceState({}, '', newUrl.toString());
     } catch (err) {
       setError('Failed to fetch preview');
       console.error('Error:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Read 'url' parameter from query string on initial load and auto-fetch
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlParam = params.get('url');
+    if (urlParam) {
+      setUrl(urlParam);
+      fetchActivity(urlParam);
+    }
+  }, []);
+
+  const handleRun = async () => {
+    await fetchActivity(url);
   };
 
   const handleKeyPress = (e) => {
