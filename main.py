@@ -182,38 +182,48 @@ async def process_url(url: str = Query(..., description="ActivityPub URL to fetc
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
 
-    # Check cache first
     cache_key = f"activity:{url}"
     cached = cache.get(cache_key)
-    if cached is not None:
-        content, final_url, content_type = cached
-        # Sign media URLs (always fresh signatures)
-        signed_media = sign_media_urls_in_content(content) if isinstance(content, dict) else {}
+    had_cache = cached is not None
 
-        result = {
-            "success": True,
-            "url": url,
-            "final_url": final_url,
-            "redirected": final_url != url,
-            "content": content,
-            "content_type": content_type,
-            "status_code": 200
-        }
-        if signed_media:
-            result["_signed_media"] = signed_media
-
-        return JSONResponse(
-            content=result,
-            headers={'Cache-Control': 'public, max-age=300', 'X-Cache': 'HIT'}
-        )
-
+    # Build request headers
     headers = {
         "Accept": "application/activity+json"
     }
 
+    # Add conditional request headers if we have cached data
+    if cached is not None:
+        content, final_url, content_type, etag, last_modified = cached
+        if etag:
+            headers["If-None-Match"] = etag
+        if last_modified:
+            headers["If-Modified-Since"] = last_modified
+
     async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
         try:
             response = await client.get(url, headers=headers)
+
+            # If 304 Not Modified, return cached content
+            if response.status_code == 304 and cached is not None:
+                content, final_url, content_type, etag, last_modified = cached
+                signed_media = sign_media_urls_in_content(content) if isinstance(content, dict) else {}
+
+                result = {
+                    "success": True,
+                    "url": url,
+                    "final_url": final_url,
+                    "redirected": final_url != url,
+                    "content": content,
+                    "content_type": content_type,
+                    "status_code": 200
+                }
+                if signed_media:
+                    result["_signed_media"] = signed_media
+
+                return JSONResponse(
+                    content=result,
+                    headers={'Cache-Control': 'public, max-age=300', 'X-Cache': 'HIT'}
+                )
 
             # Check for HTTP error status codes
             if response.status_code >= 400:
@@ -237,6 +247,10 @@ async def process_url(url: str = Query(..., description="ActivityPub URL to fetc
             # Get the final URL after redirects
             final_url = str(response.url)
             content_type = response.headers.get("content-type", "").lower()
+
+            # Extract caching headers for conditional requests
+            etag = response.headers.get("etag")
+            last_modified = response.headers.get("last-modified")
 
             # Check if response is JSON
             is_json = (
@@ -267,8 +281,8 @@ async def process_url(url: str = Query(..., description="ActivityPub URL to fetc
                     detail="URL does not appear to be an ActivityPub resource"
                 )
 
-            # Store in cache (content, final_url, content_type)
-            cache.set(cache_key, (content, final_url, content_type), expire=ACTIVITY_CACHE_TTL)
+            # Store in cache (content, final_url, content_type, etag, last_modified)
+            cache.set(cache_key, (content, final_url, content_type, etag, last_modified), expire=ACTIVITY_CACHE_TTL)
 
             # Sign media URLs
             signed_media = sign_media_urls_in_content(content) if isinstance(content, dict) else {}
@@ -286,9 +300,11 @@ async def process_url(url: str = Query(..., description="ActivityPub URL to fetc
             if signed_media:
                 result["_signed_media"] = signed_media
 
+            # UPDATED if we had cache but upstream changed, MISS if no cache existed
+            cache_status = 'UPDATED' if had_cache else 'MISS'
             return JSONResponse(
                 content=result,
-                headers={'Cache-Control': 'public, max-age=300', 'X-Cache': 'MISS'}
+                headers={'Cache-Control': 'public, max-age=300', 'X-Cache': cache_status}
             )
 
         except httpx.HTTPStatusError as e:
@@ -315,6 +331,37 @@ async def process_url(url: str = Query(..., description="ActivityPub URL to fetc
             raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 
+def build_webfinger_result(actor_data, actor_url_for_id, cache_status='MISS'):
+    """Helper to build webfinger result from actor data"""
+    parsed = urlparse(actor_url_for_id)
+    domain = parsed.netloc or ''
+
+    icon = actor_data.get('icon')
+    icon_url = extract_url_from_media_object(icon) if icon else None
+
+    signed_media = sign_media_urls_in_content(actor_data)
+
+    result = {
+        "success": True,
+        "handle": actor_data.get('preferredUsername', ''),
+        "nickname": actor_data.get('name', ''),
+        "id": actor_data.get('id', actor_url_for_id),
+        "domain": domain,
+        "tag": actor_data.get('tag', []),
+        "icon": icon_url
+    }
+    if signed_media:
+        result["_signed_media"] = signed_media
+
+    return JSONResponse(
+        content=result,
+        headers={
+            'Cache-Control': 'public, max-age=300',
+            'X-Cache': cache_status
+        }
+    )
+
+
 @app.get("/api/webfinger")
 async def webfinger(
     resource: str = Query(None, description="Webfinger resource (acct:user@domain)"),
@@ -322,6 +369,17 @@ async def webfinger(
 ):
     if not resource and not actor_url:
         raise HTTPException(status_code=400, detail="resource or actor_url is required")
+
+    # Determine cache key
+    cache_key = f"webfinger:{actor_url or resource}"
+
+    # Check cache for conditional request headers
+    cached = cache.get(cache_key)
+    had_cache = cached is not None
+    etag = None
+    last_modified = None
+    if cached is not None:
+        actor_data, resolved_actor_url, etag, last_modified = cached
 
     headers = {
         "Accept": "application/activity+json, application/jrd+json"
@@ -331,36 +389,31 @@ async def webfinger(
         try:
             # If actor_url is provided, fetch it directly
             if actor_url:
-                response = await client.get(actor_url, headers=headers)
+                req_headers = headers.copy()
+                if cached is not None:
+                    if etag:
+                        req_headers["If-None-Match"] = etag
+                    if last_modified:
+                        req_headers["If-Modified-Since"] = last_modified
+
+                response = await client.get(actor_url, headers=req_headers)
+
+                # If 304 Not Modified, return cached content
+                if response.status_code == 304 and cached is not None:
+                    return build_webfinger_result(actor_data, resolved_actor_url, cache_status='HIT')
+
                 response.raise_for_status()
                 actor_data = response.json()
 
-                # Extract domain from actor URL
-                parsed = urlparse(actor_url)
-                domain = parsed.netloc or ''
+                # Extract caching headers
+                new_etag = response.headers.get("etag")
+                new_last_modified = response.headers.get("last-modified")
 
-                # Extract icon URL
-                icon = actor_data.get('icon')
-                icon_url = extract_url_from_media_object(icon) if icon else None
+                # Cache the result
+                cache.set(cache_key, (actor_data, actor_url, new_etag, new_last_modified), expire=ACTIVITY_CACHE_TTL)
 
-                # Sign media URLs
-                signed_media = sign_media_urls_in_content(actor_data)
-
-                result = {
-                    "success": True,
-                    "handle": actor_data.get('preferredUsername', ''),
-                    "nickname": actor_data.get('name', ''),
-                    "id": actor_data.get('id', actor_url),
-                    "domain": domain,
-                    "tag": actor_data.get('tag', []),
-                    "icon": icon_url
-                }
-                if signed_media:
-                    result["_signed_media"] = signed_media
-                return JSONResponse(
-                    content=result,
-                    headers={'Cache-Control': 'public, max-age=300'}
-                )
+                cache_status = 'UPDATED' if had_cache else 'MISS'
+                return build_webfinger_result(actor_data, actor_url, cache_status=cache_status)
 
             # Otherwise, try webfinger lookup
             if resource.startswith('acct:'):
@@ -383,46 +436,29 @@ async def webfinger(
                 webfinger_data = response.json()
 
                 # Find the ActivityPub actor URL from webfinger links
-                actor_url = None
+                resolved_actor_url = None
                 for link in webfinger_data.get('links', []):
                     if link.get('type') == 'application/activity+json':
-                        actor_url = link.get('href')
+                        resolved_actor_url = link.get('href')
                         break
 
-                if not actor_url:
+                if not resolved_actor_url:
                     raise HTTPException(status_code=404, detail="No ActivityPub actor found")
 
                 # Fetch the actor
-                response = await client.get(actor_url, headers=headers)
+                response = await client.get(resolved_actor_url, headers=headers)
                 response.raise_for_status()
                 actor_data = response.json()
 
-                # Extract domain from actor URL
-                parsed = urlparse(actor_url)
-                domain = parsed.netloc or ''
+                # Extract caching headers
+                new_etag = response.headers.get("etag")
+                new_last_modified = response.headers.get("last-modified")
 
-                # Extract icon URL
-                icon = actor_data.get('icon')
-                icon_url = extract_url_from_media_object(icon) if icon else None
+                # Cache the result
+                cache.set(cache_key, (actor_data, resolved_actor_url, new_etag, new_last_modified), expire=ACTIVITY_CACHE_TTL)
 
-                # Sign media URLs
-                signed_media = sign_media_urls_in_content(actor_data)
-
-                result = {
-                    "success": True,
-                    "handle": actor_data.get('preferredUsername', ''),
-                    "nickname": actor_data.get('name', ''),
-                    "id": actor_data.get('id', actor_url),
-                    "domain": domain,
-                    "tag": actor_data.get('tag', []),
-                    "icon": icon_url
-                }
-                if signed_media:
-                    result["_signed_media"] = signed_media
-                return JSONResponse(
-                    content=result,
-                    headers={'Cache-Control': 'public, max-age=300'}
-                )
+                cache_status = 'UPDATED' if had_cache else 'MISS'
+                return build_webfinger_result(actor_data, resolved_actor_url, cache_status=cache_status)
 
             except httpx.HTTPError:
                 # If webfinger fails, try to use resource as direct actor URL
@@ -431,29 +467,15 @@ async def webfinger(
                     response.raise_for_status()
                     actor_data = response.json()
 
-                    # Extract domain from resource URL
-                    parsed = urlparse(resource)
-                    domain = parsed.netloc or ''
+                    # Extract caching headers
+                    new_etag = response.headers.get("etag")
+                    new_last_modified = response.headers.get("last-modified")
 
-                    # Extract icon URL
-                    icon = actor_data.get('icon')
-                    icon_url = extract_url_from_media_object(icon) if icon else None
+                    # Cache the result
+                    cache.set(cache_key, (actor_data, resource, new_etag, new_last_modified), expire=ACTIVITY_CACHE_TTL)
 
-                    # Sign media URLs
-                    signed_media = sign_media_urls_in_content(actor_data)
-
-                    result = {
-                        "success": True,
-                        "handle": actor_data.get('preferredUsername', ''),
-                        "nickname": actor_data.get('name', ''),
-                        "id": actor_data.get('id', resource),
-                        "domain": domain,
-                        "tag": actor_data.get('tag', []),
-                        "icon": icon_url
-                    }
-                    if signed_media:
-                        result["_signed_media"] = signed_media
-                    return JSONResponse(content=result)
+                    cache_status = 'UPDATED' if had_cache else 'MISS'
+                    return build_webfinger_result(actor_data, resource, cache_status=cache_status)
                 raise
 
         except httpx.HTTPError as e:
@@ -512,21 +534,36 @@ async def proxy_media(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid URL format")
 
-    # Check cache first
+    # Check cache for conditional request headers
     cache_key = f"media:{media_url}"
     cached = cache.get(cache_key)
+    had_cache = cached is not None
+    etag = None
+    last_modified = None
     if cached is not None:
-        content_bytes, content_type = cached
-        return Response(
-            content=content_bytes,
-            media_type=content_type or "application/octet-stream",
-            headers={'Cache-Control': 'public, max-age=3600', 'X-Cache': 'HIT'}
-        )
+        content_bytes, content_type, etag, last_modified = cached
+
+    # Build request headers for conditional request
+    req_headers = {}
+    if cached is not None:
+        if etag:
+            req_headers["If-None-Match"] = etag
+        if last_modified:
+            req_headers["If-Modified-Since"] = last_modified
 
     # Fetch media from external server
     async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, max_redirects=5) as client:
         try:
-            response = await client.get(media_url)
+            response = await client.get(media_url, headers=req_headers)
+
+            # If 304 Not Modified, return cached content
+            if response.status_code == 304 and cached is not None:
+                return Response(
+                    content=content_bytes,
+                    media_type=content_type or "application/octet-stream",
+                    headers={'Cache-Control': 'public, max-age=3600', 'X-Cache': 'HIT'}
+                )
+
             response.raise_for_status()
 
             # Validate content type - only allow media types
@@ -542,14 +579,20 @@ async def proxy_media(
 
             content_bytes = response.content
 
+            # Extract caching headers
+            new_etag = response.headers.get("etag")
+            new_last_modified = response.headers.get("last-modified")
+
             # Store in cache (limit to 10MB per file to avoid huge files)
             if len(content_bytes) <= 10 * 1024 * 1024:
-                cache.set(cache_key, (content_bytes, content_type), expire=MEDIA_CACHE_TTL)
+                cache.set(cache_key, (content_bytes, content_type, new_etag, new_last_modified), expire=MEDIA_CACHE_TTL)
 
+            # UPDATED if we had cache but upstream changed, MISS if no cache existed
+            cache_status = 'UPDATED' if had_cache else 'MISS'
             return Response(
                 content=content_bytes,
                 media_type=content_type or "application/octet-stream",
-                headers={'Cache-Control': 'public, max-age=3600', 'X-Cache': 'MISS'}
+                headers={'Cache-Control': 'public, max-age=3600', 'X-Cache': cache_status}
             )
 
         except httpx.HTTPError as e:
