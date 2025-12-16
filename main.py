@@ -4,12 +4,14 @@ import hmac
 import ipaddress
 import os
 import secrets
+import tempfile
 from urllib.parse import urlparse
 
+import diskcache
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="AP NoLogin", description="View ActivityPub notes without login")
@@ -30,6 +32,15 @@ media_secret = os.environ.get('MEDIA_HMAC_SECRET')
 if not media_secret:
     media_secret = secrets.token_urlsafe(32)
 MEDIA_HMAC_SECRET = media_secret.encode('utf-8')
+
+# Disk-based cache configuration
+CACHE_DIR = os.environ.get('CACHE_DIR', os.path.join(tempfile.gettempdir(), 'ap-nologin-cache'))
+ACTIVITY_CACHE_TTL = int(os.environ.get('ACTIVITY_CACHE_TTL', 300))  # 5 minutes
+MEDIA_CACHE_TTL = int(os.environ.get('MEDIA_CACHE_TTL', 3600))  # 1 hour
+CACHE_SIZE_LIMIT = int(os.environ.get('CACHE_SIZE_LIMIT', 500 * 1024 * 1024))  # 500MB default
+
+# Initialize disk cache
+cache = diskcache.Cache(CACHE_DIR, size_limit=CACHE_SIZE_LIMIT)
 
 
 def sign_media_url(url):
@@ -171,6 +182,31 @@ async def process_url(url: str = Query(..., description="ActivityPub URL to fetc
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
 
+    # Check cache first
+    cache_key = f"activity:{url}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        content, final_url, content_type = cached
+        # Sign media URLs (always fresh signatures)
+        signed_media = sign_media_urls_in_content(content) if isinstance(content, dict) else {}
+
+        result = {
+            "success": True,
+            "url": url,
+            "final_url": final_url,
+            "redirected": final_url != url,
+            "content": content,
+            "content_type": content_type,
+            "status_code": 200
+        }
+        if signed_media:
+            result["_signed_media"] = signed_media
+
+        return JSONResponse(
+            content=result,
+            headers={'Cache-Control': 'public, max-age=300', 'X-Cache': 'HIT'}
+        )
+
     headers = {
         "Accept": "application/activity+json"
     }
@@ -231,6 +267,9 @@ async def process_url(url: str = Query(..., description="ActivityPub URL to fetc
                     detail="URL does not appear to be an ActivityPub resource"
                 )
 
+            # Store in cache (content, final_url, content_type)
+            cache.set(cache_key, (content, final_url, content_type), expire=ACTIVITY_CACHE_TTL)
+
             # Sign media URLs
             signed_media = sign_media_urls_in_content(content) if isinstance(content, dict) else {}
 
@@ -249,7 +288,7 @@ async def process_url(url: str = Query(..., description="ActivityPub URL to fetc
 
             return JSONResponse(
                 content=result,
-                headers={'Cache-Control': 'public, max-age=300'}
+                headers={'Cache-Control': 'public, max-age=300', 'X-Cache': 'MISS'}
             )
 
         except httpx.HTTPStatusError as e:
@@ -473,89 +512,52 @@ async def proxy_media(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid URL format")
 
-    # Use streaming to avoid loading entire file into memory
-    # We need to keep the client and response alive during streaming
-    # FastAPI StreamingResponse executes the generator after the function returns,
-    # so we can't use async with which closes before the generator runs
-    client = httpx.AsyncClient(timeout=15.0, follow_redirects=True, max_redirects=5)
-    response = None
-    stream_context = None
-    try:
-        # Manually enter the stream context to keep it open
-        stream_context = client.stream('GET', media_url)
-        response = await stream_context.__aenter__()
-
-        # Read status line and headers
-        await response.aread()
-        response.raise_for_status()
-
-        # Validate content type - only allow media types
-        content_type = response.headers.get("content-type", "").lower()
-        allowed_types = (
-            "image/", "video/", "audio/",
-            "application/octet-stream"  # Some servers don't set proper content-type
-        )
-        if not any(content_type.startswith(t) for t in allowed_types):
-            # Still allow if content-type is missing (some servers don't set it)
-            if content_type:
-                await stream_context.__aexit__(None, None, None)
-                await client.aclose()
-                raise HTTPException(status_code=400, detail="Invalid content type")
-
-        # Stream the response in chunks for better performance
-        # Response stays open while FastAPI consumes the generator
-        async def generate():
-            try:
-                async for chunk in response.aiter_bytes(chunk_size=8192):
-                    yield chunk
-            finally:
-                # Clean up: exit the stream context and close the client
-                try:
-                    if stream_context:
-                        await stream_context.__aexit__(None, None, None)
-                except Exception:
-                    pass
-                try:
-                    await client.aclose()
-                except Exception:
-                    pass
-
-        # Return the media with appropriate content type and cache headers
-        headers = {
-            "Content-Type": content_type or "application/octet-stream",
-            "Cache-Control": "public, max-age=3600"  # Cache for 1 hour
-        }
-        return StreamingResponse(
-            generate(),
-            headers=headers,
-            status_code=200,
-            media_type=content_type or "application/octet-stream"
+    # Check cache first
+    cache_key = f"media:{media_url}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        content_bytes, content_type = cached
+        return Response(
+            content=content_bytes,
+            media_type=content_type or "application/octet-stream",
+            headers={'Cache-Control': 'public, max-age=3600', 'X-Cache': 'HIT'}
         )
 
-    except httpx.HTTPError as e:
-        if stream_context and response:
-            try:
-                await stream_context.__aexit__(None, None, None)
-            except Exception:
-                pass
-        await client.aclose()
-        raise HTTPException(status_code=500, detail=f"Failed to fetch media: {str(e)}")
-    except HTTPException:
-        if stream_context and response:
-            try:
-                await stream_context.__aexit__(None, None, None)
-            except Exception:
-                pass
-        await client.aclose()
-        raise
-    except Exception as e:
-        if stream_context and response:
-            try:
-                await stream_context.__aexit__(None, None, None)
-            except Exception:
-                pass
-        await client.aclose()
-        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+    # Fetch media from external server
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True, max_redirects=5) as client:
+        try:
+            response = await client.get(media_url)
+            response.raise_for_status()
+
+            # Validate content type - only allow media types
+            content_type = response.headers.get("content-type", "").lower()
+            allowed_types = (
+                "image/", "video/", "audio/",
+                "application/octet-stream"  # Some servers don't set proper content-type
+            )
+            if not any(content_type.startswith(t) for t in allowed_types):
+                # Still allow if content-type is missing (some servers don't set it)
+                if content_type:
+                    raise HTTPException(status_code=400, detail="Invalid content type")
+
+            content_bytes = response.content
+
+            # Store in cache (limit to 10MB per file to avoid huge files)
+            if len(content_bytes) <= 10 * 1024 * 1024:
+                cache.set(cache_key, (content_bytes, content_type), expire=MEDIA_CACHE_TTL)
+
+            return Response(
+                content=content_bytes,
+                media_type=content_type or "application/octet-stream",
+                headers={'Cache-Control': 'public, max-age=3600', 'X-Cache': 'MISS'}
+            )
+
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch media: {str(e)}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
 
 
 # Mount static files

@@ -9,6 +9,7 @@ dependencies = [
     "httpx>=0.25.0",
     "uvicorn[standard]>=0.30.0",
     "python-multipart>=0.0.9",
+    "diskcache>=5.6.0",
 ]
 
 [tool.flake8]
