@@ -199,6 +199,33 @@ section {
   }
 }
 
+.share-button {
+  padding: 0.5rem $spacing-md;
+  @include neu-outset;
+  border: none;
+  border-radius: $border-radius;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: $color-text;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+
+  svg {
+    width: 1em;
+    height: 1em;
+  }
+
+  &:hover {
+    @include neu-inset;
+  }
+
+  &:active {
+    @include neu-inset;
+  }
+}
+
 .error-message {
   padding: 0.75rem;
   background-color: $color-error-bg;
@@ -972,6 +999,19 @@ section {
   }
 
   .raw-json-button {
+    @include neu-outset-dark;
+    color: #e0e0e0;
+
+    &:hover {
+      @include neu-inset-dark;
+    }
+
+    &:active {
+      @include neu-inset-dark;
+    }
+  }
+
+  .share-button {
     @include neu-outset-dark;
     color: #e0e0e0;
 

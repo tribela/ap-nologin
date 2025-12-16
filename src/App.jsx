@@ -4,6 +4,7 @@ import { getMediaUrl } from './utils/emojiUtils';
 import { getQuoteUrl, getContent } from './utils/activityPubHelpers';
 import SearchIcon from './icons/SearchIcon.svg?react';
 import LoadingIcon from './icons/LoadingIcon.svg?react';
+import ShareIcon from './icons/ShareIcon.svg?react';
 import ActivityObject from './components/ActivityObject';
 
 
@@ -377,6 +378,31 @@ function App() {
     e.preventDefault();
   };
 
+  const handleShare = async () => {
+    if (!navigator.share) {
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        alert('URL copied to clipboard');
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+      return;
+    }
+
+    try {
+      await navigator.share({
+        title: 'AP NoLogin',
+        url: window.location.href
+      });
+    } catch (err) {
+      // User cancelled or share failed
+      if (err.name !== 'AbortError') {
+        console.error('Share failed:', err);
+      }
+    }
+  };
+
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape' && fullscreenMedia) {
@@ -595,13 +621,23 @@ function App() {
                 )}
               </>
             )}
-            <div style={{ marginTop: '1rem' }}>
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
               <button
                 className="raw-json-button"
                 onClick={() => setShowRawJson(!showRawJson)}
               >
                 {showRawJson ? 'Hide' : 'Show'} Raw JSON
               </button>
+              <button
+                className="share-button"
+                onClick={handleShare}
+                title="Share"
+              >
+                <ShareIcon />
+                Share
+              </button>
+            </div>
+            <div>
               {showRawJson && (
                 <div className="preview-content" style={{ marginTop: '0.5rem' }}>
                   <pre>{preview}</pre>
