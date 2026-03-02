@@ -41,10 +41,10 @@ export function getPollData(data) {
   // Check for oneOf or anyOf (poll options)
   const pollOptions = data.oneOf || data.anyOf || null;
   if (!pollOptions || !Array.isArray(pollOptions) || pollOptions.length === 0) return null;
-  
+
   // Determine which field was used
   const pollType = data.oneOf ? 'oneOf' : (data.anyOf ? 'anyOf' : null);
-  
+
   return {
     options: pollOptions,
     closed: data.closed || false,
@@ -70,16 +70,16 @@ function isPublicAudience(audienceArray) {
 // Helper function to determine audience visibility type
 export function getAudienceVisibility(audience) {
   if (!audience) return null;
-  
+
   const to = audience.to || [];
   const cc = audience.cc || [];
-  
+
   const hasPublic = isPublicAudience(to) || isPublicAudience(cc);
-  
+
   if (hasPublic) {
     return 'public';
   }
-  
+
   // Check if unlisted (public not in to, but in cc or has followers)
   const hasPublicInTo = isPublicAudience(to);
   const hasPublicInCc = isPublicAudience(cc);
@@ -87,11 +87,11 @@ export function getAudienceVisibility(audience) {
     const value = typeof item === 'string' ? item : (item.id || item.href || '');
     return value.includes('followers') || value.includes('/followers');
   });
-  
+
   if (!hasPublicInTo && (hasPublicInCc || hasFollowers || cc.length > 0)) {
     return 'unlisted';
   }
-  
+
   return null;
 }
 
@@ -111,7 +111,7 @@ export function getAudience(data) {
     }
   });
   // Check if any audience field has values
-  const hasAudience = ['to', 'cc', 'bto', 'bcc'].some(key => 
+  const hasAudience = ['to', 'cc', 'bto', 'bcc'].some(key =>
     Array.isArray(audience[key]) && audience[key].length > 0
   );
   return hasAudience ? audience : null;
@@ -134,9 +134,9 @@ export function categorizeTags(tags = []) {
   const hashtags = [];
   const mentions = [];
   const other = [];
-  
+
   if (!Array.isArray(tags)) return { hashtags, mentions, other };
-  
+
   tags.forEach(tag => {
     if (typeof tag === 'object' && tag !== null) {
       if (tag.type === 'Hashtag' || tag.type === 'http://www.w3.org/ns/activitystreams#Hashtag') {
@@ -148,7 +148,7 @@ export function categorizeTags(tags = []) {
       }
     }
   });
-  
+
   return { hashtags, mentions, other };
 }
 

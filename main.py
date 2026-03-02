@@ -11,7 +11,7 @@ import diskcache
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="AP NoLogin", description="View ActivityPub notes without login")
@@ -454,8 +454,11 @@ async def webfinger(
                 new_etag = response.headers.get("etag")
                 new_last_modified = response.headers.get("last-modified")
 
-                # Cache the result
-                cache.set(cache_key, (actor_data, resolved_actor_url, new_etag, new_last_modified), expire=ACTIVITY_CACHE_TTL)
+                cache.set(
+                    cache_key,
+                    (actor_data, resolved_actor_url, new_etag, new_last_modified),
+                    expire=ACTIVITY_CACHE_TTL
+                )
 
                 cache_status = 'UPDATED' if had_cache else 'MISS'
                 return build_webfinger_result(actor_data, resolved_actor_url, cache_status=cache_status)

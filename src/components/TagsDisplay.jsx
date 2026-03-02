@@ -10,11 +10,12 @@ export default function TagsDisplay({ tags, signedMedia = {} }) {
     <div className="tags-container">
       {hashtags.length > 0 && (
         <div className="hashtags">
-          {hashtags.map((tag, idx) => {
+          {hashtags.map((tag) => {
+            const key = `hashtag-${tag.name}-${tag.href}`;
             const name = tag.name || tag.href || '';
             const href = tag.href || `#${name.replace('#', '')}`;
             return (
-              <a key={idx} href={href} target="_blank" rel="noopener noreferrer" className="hashtag">
+              <a key={key} href={href} target="_blank" rel="noopener noreferrer" className="hashtag">
                 #{name.replace('#', '')}
               </a>
             );
@@ -23,11 +24,12 @@ export default function TagsDisplay({ tags, signedMedia = {} }) {
       )}
       {mentions.length > 0 && (
         <div className="mentions">
-          {mentions.map((mention, idx) => {
+          {mentions.map((mention) => {
+            const key = `mention-${mention.name}-${mention.href}`;
             const href = mention.href || mention.id || '';
             const name = mention.name || href;
             return (
-              <a key={idx} href={href} target="_blank" rel="noopener noreferrer" className="mention">
+              <a key={key} href={href} target="_blank" rel="noopener noreferrer" className="mention">
                 @{name}
               </a>
             );

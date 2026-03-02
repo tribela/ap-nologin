@@ -30,6 +30,7 @@ export default function Audience({ audience }) {
           {displayItems.map((item, idx) => {
             const url = typeof item === 'string' ? item : (item.id || item.href || '');
             const name = typeof item === 'object' && item.name ? item.name : url;
+            const itemKey = url || `audience-${idx}`;
             // Try to extract handle from URL or name
             let displayName = name;
             if (url && typeof url === 'string') {
@@ -49,7 +50,7 @@ export default function Audience({ audience }) {
             }
             
             return (
-              <React.Fragment key={idx}>
+              <React.Fragment key={itemKey}>
                 {url && url.startsWith('http') ? (
                   <a 
                     href={url} 

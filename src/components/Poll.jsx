@@ -49,9 +49,10 @@ export default function Poll({ pollData }) {
           const voteCount = typeof votes === 'number' ? votes : 0;
           const percentage = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
           const optionName = option.name || option.content || `Option ${idx + 1}`;
+          const key = `poll-option-${optionName}`;
 
           return (
-            <div key={idx} className="poll-option">
+            <div key={key} className="poll-option">
               <div className="poll-option-header">
                 <span className="poll-option-name">{optionName}</span>
                 <span className="poll-option-stats">

@@ -70,9 +70,10 @@ export default function ActivityObject({
           <>
             {linkPreviews.length > 0 && (
               <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {linkPreviews.map((link, idx) => (
-                  <LinkPreview key={idx} link={link} />
-                ))}
+                {linkPreviews.map((link, idx) => {
+                  const key = link.url || `link-preview-${idx}`;
+                  return <LinkPreview key={key} link={link} />
+                })}
               </div>
             )}
             {mediaAttachments.length > 0 && (
@@ -95,14 +96,14 @@ export default function ActivityObject({
                   const isSensitive = att && typeof att === 'object' && (att.sensitive === true || att.sensitive === 'true');
                   if (!url) return null;
 
+                  const itemKey = `media-${url}`;
                   if (isSensitive && !shouldShowAttachments) return null;
 
                   const signature = mergedSignedMedia[url] || null;
                   const mediaElement = (() => {
                     if (mediaType.startsWith('image/')) {
                       return (
-                        <img
-                          key={idx}
+                        <img key={itemKey}
                           src={getMediaUrl(url, signature)}
                           alt={name}
                           onClick={() => setFullscreenMedia && setFullscreenMedia({ type: 'image', url, name, signature })}
@@ -111,8 +112,7 @@ export default function ActivityObject({
                       );
                     } else if (mediaType.startsWith('video/')) {
                       return (
-                        <video
-                          key={idx}
+                        <video key={itemKey}
                           src={getMediaUrl(url, signature)}
                           controls
                           onClick={() => setFullscreenMedia && setFullscreenMedia({ type: 'video', url, name, signature })}
@@ -123,8 +123,7 @@ export default function ActivityObject({
                       );
                     } else if (mediaType.startsWith('audio/')) {
                       return (
-                        <audio
-                          key={idx}
+                        <audio key={itemKey}
                           src={getMediaUrl(url, signature)}
                           controls
                           style={{ width: '100%', maxWidth: '500px' }}
@@ -134,8 +133,7 @@ export default function ActivityObject({
                       );
                     } else {
                       return (
-                        <a
-                          key={idx}
+                        <a key={itemKey}
                           href={url}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -148,10 +146,10 @@ export default function ActivityObject({
                   })();
 
                   if (isSensitive) {
-                    const mediaKey = `sensitive-${idx}`;
+                    const mediaKey = `sensitive-${itemKey}`;
                     const isMediaShown = showSensitiveMedia[mediaKey] || false;
                     return (
-                      <div key={idx} className="sensitive-media-container">
+                      <div key={itemKey} className="sensitive-media-container">
                         <div className={`sensitive-media-wrapper ${isMediaShown ? 'shown' : ''}`}>
                           {mediaElement}
                         </div>

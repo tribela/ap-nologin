@@ -1,4 +1,5 @@
 import React from 'react';
+import DOMPurify from 'dompurify';
 
 // Helper function to proxy media URLs through backend
 // Note: HMAC signature should be generated server-side when processing ActivityPub objects
@@ -144,11 +145,13 @@ export function renderHtmlWithEmojis(htmlContent, tags = [], signedMedia = {}) {
       } catch (e) {
         console.error('Error parsing HTML:', e);
         // Fallback to dangerouslySetInnerHTML if parsing fails
-        return <div dangerouslySetInnerHTML={{ __html: htmlContent }} />;
+        const sanitized = DOMPurify.sanitize(htmlContent);
+        return <div dangerouslySetInnerHTML={{ __html: sanitized }} />;
       }
     } else {
       // Fallback for environments without DOMParser
-      return <div dangerouslySetInnerHTML={{ __html: htmlContent }} />;
+      const sanitized = DOMPurify.sanitize(htmlContent);
+      return <div dangerouslySetInnerHTML={{ __html: sanitized }} />;
     }
   }
 
