@@ -1,7 +1,7 @@
 // Variables
-$border-radius: 20px;
-$border-radius-lg: 25px;
-$border-radius-sm: 15px;
+$border-radius: 0;
+$border-radius-lg: 0;
+$border-radius-sm: 0;
 $spacing-xs: 0.25rem;
 $spacing-sm: 0.5rem;
 $spacing-md: 1rem;
@@ -9,54 +9,55 @@ $spacing-lg: 1.5rem;
 $spacing-xl: 2rem;
 $spacing-3xl: 3rem;
 
-// Neumorphism colors
-$neu-bg: #e0e5ec;
-$neu-bg-dark: #1a1d24;
-$neu-shadow-light: #ffffff;
-$neu-shadow-dark: #a3b1c6;
-$neu-shadow-dark-light: rgba(255, 255, 255, 0.05);
-$neu-shadow-dark-dark: #0f1115;
+// Neo-brutalism
+$border-width: 3px;
+$shadow-offset: 5px;
+$color-black: #000;
+$color-white: #fff;
+
+$bg-base: #fffef2;
+$bg-base-dark: #1a1a1a;
+$bg-card: #fffef2;
+$bg-input: #fff;
+$bg-input-dark: #2d2d2d;
 
 $color-primary: #2563eb;
 $color-primary-dark: #1d4ed8;
 $color-secondary: #6c757d;
 $color-error: #dc3545;
-$color-error-bg: #fee;
+$color-error-bg: #ffe0e0;
 $color-error-text: #c33;
-$color-border: transparent;
-$color-border-light: transparent;
-$color-bg-light: #e0e5ec;
-$color-bg-blue: #e0e5ec;
-$color-bg-blue-border: transparent;
-$color-text: #2d3748;
-$color-text-muted: #4a5568;
-$color-white: #fff;
-$color-black: #000;
+$color-border: $color-black;
+$color-text: #000;
+$color-text-muted: #333;
 
-$overlay-bg: rgba(0, 0, 0, 0.1);
-$overlay-bg-hover: rgba(0, 0, 0, 0.2);
-$overlay-button-bg: rgba(0, 0, 0, 0.6);
-$overlay-button-bg-hover: rgba(0, 0, 0, 0.8);
+$overlay-bg: rgba(0, 0, 0, 0.2);
+$overlay-bg-hover: rgba(0, 0, 0, 0.3);
+$overlay-button-bg: rgba(0, 0, 0, 0.7);
+$overlay-button-bg-hover: rgba(0, 0, 0, 0.9);
 
-// Neumorphism mixins
-@mixin neu-outset {
-  background: $neu-bg;
-  box-shadow: 8px 8px 16px $neu-shadow-dark, -8px -8px 16px $neu-shadow-light;
+@mixin neo-outset {
+  background: $bg-card;
+  border: $border-width solid $color-black;
+  box-shadow: $shadow-offset $shadow-offset 0 $color-black;
 }
 
-@mixin neu-inset {
-  background: $neu-bg;
-  box-shadow: inset 8px 8px 16px $neu-shadow-dark, inset -8px -8px 16px $neu-shadow-light;
+@mixin neo-inset {
+  background: $bg-input;
+  border: $border-width solid $color-black;
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.1);
 }
 
-@mixin neu-outset-dark {
-  background: $neu-bg-dark;
-  box-shadow: 8px 8px 16px $neu-shadow-dark-dark, -8px -8px 16px $neu-shadow-dark-light;
+@mixin neo-outset-dark {
+  background: $bg-input-dark;
+  border: $border-width solid $color-white;
+  box-shadow: $shadow-offset $shadow-offset 0 $color-white;
 }
 
-@mixin neu-inset-dark {
-  background: $neu-bg-dark;
-  box-shadow: inset 8px 8px 16px $neu-shadow-dark-dark, inset -8px -8px 16px $neu-shadow-dark-light;
+@mixin neo-inset-dark {
+  background: $bg-input-dark;
+  border: $border-width solid $color-white;
+  box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.05);
 }
 
 .App {
@@ -69,7 +70,7 @@ $overlay-button-bg-hover: rgba(0, 0, 0, 0.8);
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
-  background: $neu-bg;
+  background: $bg-base;
 }
 
 .App-header {
@@ -80,8 +81,8 @@ $overlay-button-bg-hover: rgba(0, 0, 0, 0.8);
     font-size: 2.5rem;
     color: $color-text;
     margin-bottom: $spacing-sm;
-    font-weight: 700;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1), -1px -1px 2px rgba(255, 255, 255, 0.8);
+    font-weight: 800;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -95,7 +96,7 @@ $overlay-button-bg-hover: rgba(0, 0, 0, 0.8);
 }
 
 section {
-  @include neu-outset;
+  @include neo-outset;
   padding: $spacing-xl;
   border-radius: $border-radius-lg;
   box-sizing: border-box;
@@ -120,19 +121,20 @@ section {
   flex: 1;
   padding: 0.75rem $spacing-md;
   font-size: 1rem;
-  border: none;
   border-radius: $border-radius;
   outline: none;
-  @include neu-inset;
+  @include neo-inset;
   color: $color-text;
-  transition: all 0.2s;
+  transition: box-shadow 0.15s, transform 0.15s;
 
   &:focus {
-    @include neu-outset;
+    box-shadow: $shadow-offset $shadow-offset 0 $color-black;
+    border: $border-width solid $color-black;
+    background: $bg-input;
   }
 
   &:disabled {
-    @include neu-inset;
+    @include neo-inset;
     opacity: 0.6;
     cursor: not-allowed;
   }
@@ -146,11 +148,10 @@ section {
   align-items: center;
   justify-content: center;
   font-size: 1rem;
-  font-weight: 600;
-  border: none;
+  font-weight: 700;
   border-radius: $border-radius;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: box-shadow 0.15s, transform 0.15s;
   white-space: nowrap;
 
   .icon {
@@ -158,20 +159,24 @@ section {
   }
 
   &:not(:disabled) {
-    @include neu-outset;
+    @include neo-outset;
   }
 
   &:hover:not(:disabled) {
-    @include neu-inset;
+    transform: translate(2px, 2px);
+    box-shadow: ($shadow-offset - 2px) ($shadow-offset - 2px) 0 $color-black;
   }
 
   &:active:not(:disabled) {
-    @include neu-inset;
+    transform: translate($shadow-offset, $shadow-offset);
+    box-shadow: none;
   }
 
   &:disabled {
-    @include neu-inset;
-    opacity: 0.5;
+    border: $border-width solid #999;
+    background: #e5e5e5;
+    box-shadow: 3px 3px 0 #999;
+    opacity: 0.7;
     cursor: not-allowed;
 
     .icon {
@@ -182,32 +187,34 @@ section {
 
 .raw-json-button {
   padding: 0.5rem $spacing-md;
-  @include neu-outset;
-  border: none;
+  @include neo-outset;
   border-radius: $border-radius;
   cursor: pointer;
   font-size: 0.9rem;
+  font-weight: 600;
   color: $color-text;
-  transition: all 0.2s ease;
+  transition: box-shadow 0.15s, transform 0.15s;
 
   &:hover {
-    @include neu-inset;
+    transform: translate(2px, 2px);
+    box-shadow: ($shadow-offset - 2px) ($shadow-offset - 2px) 0 $color-black;
   }
 
   &:active {
-    @include neu-inset;
+    transform: translate($shadow-offset, $shadow-offset);
+    box-shadow: none;
   }
 }
 
 .share-button {
   padding: 0.5rem $spacing-md;
-  @include neu-outset;
-  border: none;
+  @include neo-outset;
   border-radius: $border-radius;
   cursor: pointer;
   font-size: 0.9rem;
+  font-weight: 600;
   color: $color-text;
-  transition: all 0.2s ease;
+  transition: box-shadow 0.15s, transform 0.15s;
   display: flex;
   align-items: center;
   gap: $spacing-xs;
@@ -218,11 +225,13 @@ section {
   }
 
   &:hover {
-    @include neu-inset;
+    transform: translate(2px, 2px);
+    box-shadow: ($shadow-offset - 2px) ($shadow-offset - 2px) 0 $color-black;
   }
 
   &:active {
-    @include neu-inset;
+    transform: translate($shadow-offset, $shadow-offset);
+    box-shadow: none;
   }
 }
 
@@ -230,18 +239,20 @@ section {
   padding: 0.75rem;
   background-color: $color-error-bg;
   color: $color-error-text;
-  border-left: 4px solid $color-error;
-  border-radius: $border-radius;
+  border: $border-width solid $color-black;
+  box-shadow: $shadow-offset $shadow-offset 0 $color-black;
   font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .content-warning {
   margin-bottom: 0.5rem;
   padding: 0.5rem;
   background-color: #fff3cd;
-  border: 1px solid #ffc107;
-  border-radius: 4px;
+  border: $border-width solid $color-black;
+  box-shadow: 3px 3px 0 $color-black;
   font-size: 0.9rem;
+  font-weight: 600;
   color: #856404;
 
   strong {
@@ -252,15 +263,17 @@ section {
     margin-left: 0.5rem;
     padding: 0.25rem 0.5rem;
     background-color: #fff;
-    border: 1px solid #ffc107;
-    border-radius: 4px;
+    border: $border-width solid $color-black;
+    box-shadow: 2px 2px 0 $color-black;
     cursor: pointer;
     font-size: 0.85rem;
+    font-weight: 600;
     color: #856404;
-    transition: all 0.2s;
+    transition: transform 0.15s, box-shadow 0.15s;
 
     &:hover {
-      background-color: #f0f0f0;
+      transform: translate(1px, 1px);
+      box-shadow: 1px 1px 0 $color-black;
     }
   }
 }
@@ -275,7 +288,7 @@ section {
 
 .preview-content {
   padding: $spacing-lg;
-  @include neu-inset;
+  @include neo-inset;
   border-radius: $border-radius;
   border: none;
   min-height: 200px;
@@ -296,7 +309,7 @@ section {
 .activitypub-info {
   margin-bottom: $spacing-lg;
   padding: $spacing-lg;
-  @include neu-outset;
+  @include neo-outset;
   border-radius: $border-radius;
   border: none;
 
@@ -344,15 +357,16 @@ section {
   padding: $spacing-xs 0.75rem;
   background-color: $color-primary;
   color: $color-white;
-  border-radius: $border-radius-sm;
+  border: $border-width solid $color-black;
+  box-shadow: 2px 2px 0 $color-black;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .content-html {
   margin-top: $spacing-sm;
   padding: $spacing-md;
-  @include neu-inset;
+  @include neo-inset;
   border-radius: $border-radius;
   border: none;
   line-height: 1.6;
@@ -396,8 +410,8 @@ section {
   .content-html__attachment-link {
     display: block;
     padding: 0.5rem;
-    border: 1px solid $neu-shadow-dark;
-    border-radius: 4px;
+    border: $border-width solid $color-black;
+    box-shadow: 2px 2px 0 $color-black;
     text-decoration: none;
     color: $color-primary;
 
@@ -412,9 +426,8 @@ section {
     padding: 0.75rem $spacing-md;
     padding-left: $spacing-lg;
     border: none;
-    border-left: 4px solid rgba(0, 0, 0, 0.1);
-    @include neu-inset;
-    border-radius: 0 $border-radius $border-radius 0;
+    border-left: 4px solid $color-black;
+    background: $bg-input;
     color: $color-text-muted;
     font-style: italic;
 
@@ -573,7 +586,8 @@ section {
   min-height: 40px !important;
   max-width: 40px !important;
   max-height: 40px !important;
-  border-radius: 50%;
+  border: $border-width solid $color-black;
+  box-shadow: 3px 3px 0 $color-black;
   object-fit: cover;
   object-position: center;
   flex-shrink: 0;
@@ -731,7 +745,7 @@ section {
 .poll-container {
   margin-top: $spacing-md;
   padding: $spacing-md;
-  @include neu-inset;
+  @include neo-inset;
   border-radius: $border-radius;
   border: none;
 }
@@ -807,26 +821,26 @@ section {
 
 .poll-option-bar-container {
   width: 100%;
-  height: 8px;
-  @include neu-inset;
-  border-radius: $border-radius-sm;
+  height: 10px;
+  border: $border-width solid $color-black;
   overflow: hidden;
   position: relative;
+  background: $bg-input;
 }
 
 .poll-option-bar {
   height: 100%;
   background: $color-primary;
-  border-radius: $border-radius-sm;
+  border-right: $border-width solid $color-black;
   transition: width 0.3s ease;
 }
 
 .poll-footer {
   margin-top: $spacing-sm;
   padding-top: $spacing-sm;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: $border-width solid $color-black;
   font-size: 0.85rem;
-  opacity: 0.7;
+  font-weight: 600;
   color: $color-text-muted;
 }
 
@@ -835,7 +849,7 @@ section {
   margin-top: $spacing-sm;
   margin-bottom: $spacing-sm;
   padding: $spacing-sm;
-  @include neu-inset;
+  @include neo-inset;
   border-radius: $border-radius;
   font-size: 0.85rem;
 
@@ -946,7 +960,7 @@ section {
 .link-preview {
   margin-top: $spacing-sm;
   padding: $spacing-sm;
-  @include neu-inset;
+  @include neo-inset;
   border-radius: $border-radius;
   display: flex;
   gap: $spacing-sm;
@@ -997,29 +1011,29 @@ section {
 // Dark mode support
 @media (prefers-color-scheme: dark) {
   .App {
-    background: $neu-bg-dark;
+    background: $bg-base-dark;
     color: #e0e0e0;
   }
 
   .App-header h1 {
     color: #e0e0e0;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5), -1px -1px 2px rgba(255, 255, 255, 0.05);
+    font-weight: 800;
   }
 
   section {
-    @include neu-outset-dark;
+    @include neo-outset-dark;
   }
 
   .url-input {
-    @include neu-inset-dark;
+    @include neo-inset-dark;
     color: #e0e0e0;
 
     &:focus {
-      @include neu-outset-dark;
+      @include neo-outset-dark;
     }
 
     &:disabled {
-      @include neu-inset-dark;
+      @include neo-inset-dark;
       opacity: 0.6;
     }
   }
@@ -1030,20 +1044,24 @@ section {
     }
 
     &:not(:disabled) {
-      @include neu-outset-dark;
+      @include neo-outset-dark;
     }
 
     &:hover:not(:disabled) {
-      @include neu-inset-dark;
+      transform: translate(2px, 2px);
+      box-shadow: ($shadow-offset - 2px) ($shadow-offset - 2px) 0 $color-white;
     }
 
     &:active:not(:disabled) {
-      @include neu-inset-dark;
+      transform: translate($shadow-offset, $shadow-offset);
+      box-shadow: none;
     }
 
     &:disabled {
-      @include neu-inset-dark;
-      opacity: 0.5;
+      border-color: #666;
+      background: #333;
+      box-shadow: 3px 3px 0 #666;
+      opacity: 0.7;
 
       .icon {
         stroke: #6c757d;
@@ -1052,44 +1070,49 @@ section {
   }
 
   .raw-json-button {
-    @include neu-outset-dark;
+    @include neo-outset-dark;
     color: #e0e0e0;
 
     &:hover {
-      @include neu-inset-dark;
+      transform: translate(2px, 2px);
+      box-shadow: ($shadow-offset - 2px) ($shadow-offset - 2px) 0 $color-white;
     }
 
     &:active {
-      @include neu-inset-dark;
+      transform: translate($shadow-offset, $shadow-offset);
+      box-shadow: none;
     }
   }
 
   .share-button {
-    @include neu-outset-dark;
+    @include neo-outset-dark;
     color: #e0e0e0;
 
     &:hover {
-      @include neu-inset-dark;
+      transform: translate(2px, 2px);
+      box-shadow: ($shadow-offset - 2px) ($shadow-offset - 2px) 0 $color-white;
     }
 
     &:active {
-      @include neu-inset-dark;
+      transform: translate($shadow-offset, $shadow-offset);
+      box-shadow: none;
     }
   }
 
   .error-message {
     background-color: #4a1f1f;
     color: #ff6b6b;
-    border-left-color: #dc3545;
+    border-color: $color-white;
+    box-shadow: $shadow-offset $shadow-offset 0 $color-white;
   }
 
   .preview-content {
-    @include neu-inset-dark;
+    @include neo-inset-dark;
     color: #e0e0e0;
   }
 
   .activitypub-info {
-    @include neu-outset-dark;
+    @include neo-outset-dark;
   }
 
   .activitypub-info h3 {
@@ -1111,7 +1134,7 @@ section {
   }
 
   .content-html {
-    @include neu-inset-dark;
+    @include neo-inset-dark;
     color: #e0e0e0;
 
     a {
@@ -1132,8 +1155,8 @@ section {
     }
 
     blockquote {
-      @include neu-inset-dark;
-      border-left-color: rgba(255, 255, 255, 0.1);
+      background: $bg-input-dark;
+      border-left-color: $color-white;
       color: #b0b0b0;
     }
   }
@@ -1170,6 +1193,11 @@ section {
     opacity: 0.8;
   }
 
+  .user-header-avatar {
+    border-color: $color-white;
+    box-shadow: 3px 3px 0 $color-white;
+  }
+
   .sensitive-media-overlay {
     background-color: rgba(0, 0, 0, 0.3);
 
@@ -1199,7 +1227,7 @@ section {
   }
 
   .poll-container {
-    @include neu-inset-dark;
+    @include neo-inset-dark;
     color: #e0e0e0;
   }
 
@@ -1227,7 +1255,7 @@ section {
   }
 
   .poll-option-bar-container {
-    @include neu-inset-dark;
+    @include neo-inset-dark;
   }
 
   .poll-option-bar {
@@ -1240,7 +1268,7 @@ section {
   }
 
   .audience-container {
-    @include neu-inset-dark;
+    @include neo-inset-dark;
     color: #e0e0e0;
   }
 
@@ -1271,7 +1299,7 @@ section {
 
 
   .link-preview {
-    @include neu-inset-dark;
+    @include neo-inset-dark;
     color: #e0e0e0;
   }
 
@@ -1293,7 +1321,7 @@ section {
     padding-left: $spacing-md;
     border-left: 2px solid rgba(255, 255, 255, 0.15);
     border-radius: $border-radius-sm;
-    @include neu-inset-dark;
+    @include neo-inset-dark;
     font-size: 0.85em;
     color: #b0b0b0;
   }
@@ -1326,7 +1354,7 @@ section {
     padding-left: $spacing-md;
     border-left: 2px solid rgba(255, 255, 255, 0.15);
     border-radius: $border-radius-sm;
-    @include neu-inset-dark;
+    @include neo-inset-dark;
   }
 
   .replies-object--loading,
@@ -1353,9 +1381,9 @@ section {
     margin-bottom: $spacing-md;
     padding: $spacing-sm;
     padding-left: $spacing-md;
-    border-left: 2px solid $neu-shadow-dark;
+    border-left: 2px solid $color-black;
     border-radius: $border-radius-sm;
-    @include neu-inset;
+    @include neo-inset;
     font-size: 0.85em;
   }
 
@@ -1385,9 +1413,9 @@ section {
     margin-top: $spacing-md;
     padding: $spacing-sm;
     padding-left: $spacing-md;
-    border-left: 2px solid $neu-shadow-dark;
+    border-left: 2px solid $color-black;
     border-radius: $border-radius-sm;
-    @include neu-inset;
+    @include neo-inset;
   }
 
   .replies-object--loading,
