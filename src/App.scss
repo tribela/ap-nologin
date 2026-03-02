@@ -393,6 +393,20 @@ section {
     }
   }
 
+  .content-html__attachment-link {
+    display: block;
+    padding: 0.5rem;
+    border: 1px solid $neu-shadow-dark;
+    border-radius: 4px;
+    text-decoration: none;
+    color: $color-primary;
+
+    &:hover {
+      text-decoration: underline;
+      color: $color-primary-dark;
+    }
+  }
+
   blockquote {
     margin: $spacing-md 0;
     padding: 0.75rem $spacing-md;
@@ -900,6 +914,34 @@ section {
   font-size: 0.8rem;
 }
 
+// QuoteObject variants (light theme)
+.quote-object.content-html {
+  margin-top: $spacing-md;
+}
+
+.quote-object--truncated.content-html {
+  padding: $spacing-sm;
+}
+
+.quote-object__truncated {
+  font-style: italic;
+  color: $color-text-muted;
+}
+
+.quote-object__loading {
+  color: $color-text-muted;
+}
+
+.quote-object__error-message {
+  font-weight: bold;
+  color: $color-error;
+
+  &[data-error-code="404"],
+  &[data-error-code="410"] {
+    color: #ed6c02;
+  }
+}
+
 // LinkPreview styles
 .link-preview {
   margin-top: $spacing-sm;
@@ -1080,6 +1122,15 @@ section {
       }
     }
 
+    .content-html__attachment-link {
+      border-color: rgba(255, 255, 255, 0.2);
+      color: #60a5fa;
+
+      &:hover {
+        color: #93c5fd;
+      }
+    }
+
     blockquote {
       @include neu-inset-dark;
       border-left-color: rgba(255, 255, 255, 0.1);
@@ -1089,9 +1140,29 @@ section {
 
   .quote-object {
     color: #e0e0e0;
+  }
 
-    div[style*="color: #666"] {
-      color: #999 !important;
+  .quote-object__truncated {
+    font-style: italic;
+    color: #999;
+  }
+
+  .quote-object__loading {
+    color: #b0b0b0;
+  }
+
+  .quote-object__error-message {
+    font-weight: bold;
+
+    &[data-error-code="401"],
+    &[data-error-code="403"],
+    &[data-error-code="500"] {
+      color: #ff6b6b;
+    }
+
+    &[data-error-code="404"],
+    &[data-error-code="410"] {
+      color: #ed6c02;
     }
   }
 
@@ -1214,6 +1285,126 @@ section {
 
   .link-preview-type {
     color: #b0b0b0;
+  }
+
+  .reply-object {
+    margin-bottom: $spacing-md;
+    padding: $spacing-sm;
+    padding-left: $spacing-md;
+    border-left: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: $border-radius-sm;
+    @include neu-inset-dark;
+    font-size: 0.85em;
+    color: #b0b0b0;
+  }
+
+  .reply-object__label {
+    color: #b0b0b0;
+    margin-bottom: $spacing-xs;
+  }
+
+  .reply-object__link {
+    color: #60a5fa;
+    &:hover {
+      color: #93c5fd;
+    }
+  }
+
+  .reply-object__loading,
+  .reply-object__error {
+    color: #b0b0b0;
+    font-size: 0.9em;
+  }
+
+  .reply-object__error {
+    color: #ff6b6b;
+  }
+
+  .replies-object {
+    margin-top: $spacing-md;
+    padding: $spacing-sm;
+    padding-left: $spacing-md;
+    border-left: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: $border-radius-sm;
+    @include neu-inset-dark;
+  }
+
+  .replies-object--loading,
+  .replies-object--error {
+    border-left-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .replies-object__loading,
+  .replies-object__heading {
+    font-size: 0.85em;
+    color: #b0b0b0;
+    margin-bottom: $spacing-xs;
+  }
+
+  .replies-object__error {
+    font-size: 0.85em;
+    color: #ff6b6b;
+  }
+}
+
+// Reply / replies (light theme only – dark uses rules inside @media (prefers-color-scheme: dark))
+@media (prefers-color-scheme: light) {
+  .reply-object {
+    margin-bottom: $spacing-md;
+    padding: $spacing-sm;
+    padding-left: $spacing-md;
+    border-left: 2px solid $neu-shadow-dark;
+    border-radius: $border-radius-sm;
+    @include neu-inset;
+    font-size: 0.85em;
+  }
+
+  .reply-object__label {
+    color: $color-text-muted;
+    margin-bottom: $spacing-xs;
+  }
+
+  .reply-object__loading,
+  .reply-object__error {
+    color: $color-text-muted;
+    font-size: 0.9em;
+  }
+
+  .reply-object__error {
+    color: $color-error;
+  }
+
+  .reply-object__link {
+    color: $color-primary;
+    &:hover {
+      color: $color-primary-dark;
+    }
+  }
+
+  .replies-object {
+    margin-top: $spacing-md;
+    padding: $spacing-sm;
+    padding-left: $spacing-md;
+    border-left: 2px solid $neu-shadow-dark;
+    border-radius: $border-radius-sm;
+    @include neu-inset;
+  }
+
+  .replies-object--loading,
+  .replies-object--error {
+    border-left-color: rgba(0, 0, 0, 0.15);
+  }
+
+  .replies-object__loading,
+  .replies-object__heading {
+    font-size: 0.85em;
+    color: $color-text-muted;
+    margin-bottom: $spacing-xs;
+  }
+
+  .replies-object__error {
+    font-size: 0.85em;
+    color: $color-error;
   }
 }
 

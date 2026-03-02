@@ -152,3 +152,42 @@ export function categorizeTags(tags = []) {
   return { hashtags, mentions, other };
 }
 
+// Helper function to extract inReplyTo URL from ActivityPub object
+export function getReplyTo(data) {
+  if (!data || typeof data !== 'object') return null;
+  
+  const inReplyTo = data.inReplyTo;
+  if (!inReplyTo) return null;
+  
+  // Can be a string (URL) or an object with id
+  if (typeof inReplyTo === 'string') {
+    return inReplyTo;
+  }
+  
+  if (typeof inReplyTo === 'object' && inReplyTo !== null && inReplyTo.id) {
+    return inReplyTo.id;
+  }
+  
+  return null;
+}
+
+// Helper function to extract replies collection URL from ActivityPub object
+export function getReplies(data) {
+  if (!data || typeof data !== 'object') return null;
+
+  const replies = data.replies;
+  if (!replies) return null;
+
+  if (typeof replies === 'string') return replies;
+  if (typeof replies === 'object' && replies !== null) {
+    if (replies.id) return replies.id;
+    if (replies.first) {
+      const first = replies.first;
+      if (typeof first === 'string') return first;
+      if (typeof first === 'object' && first.id) return first.id;
+    }
+  }
+
+  return null;
+}
+

@@ -173,33 +173,26 @@ function QuoteObject({ quoteUrl, depth = 0, maxDepth = 3 }) {
   // If max depth exceeded, show simple "quoted content" message
   if (depth >= maxDepth) {
     return (
-      <div className="quote-object content-html" style={{ marginTop: '1rem', padding: '0.5rem' }}>
-        <div style={{ fontStyle: 'italic', color: '#666' }}>quoted content</div>
+      <div className="quote-object quote-object--truncated content-html">
+        <div className="quote-object__truncated">quoted content</div>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="quote-object content-html" style={{ marginTop: '1rem', padding: '1rem' }}>
-        <div>Loading quote...</div>
+      <div className="quote-object content-html">
+        <div className="quote-object__loading">Loading quote...</div>
       </div>
     );
   }
 
   if (errorStatus) {
-    const errorColors = {
-      401: '#d32f2f',
-      404: '#ed6c02',
-      410: '#ed6c02',
-      403: '#d32f2f',
-      500: '#d32f2f',
-    };
-    const color = errorColors[errorStatus.code] || '#d32f2f';
+    const errorCode = errorStatus.code;
     return (
-      <div className="quote-object content-html" style={{ marginTop: '1rem', padding: '1rem' }}>
-        <div style={{ color, fontWeight: 'bold' }}>
-          {errorStatus.message} ({errorStatus.code})
+      <div className="quote-object quote-object--error content-html">
+        <div className="quote-object__error-message" data-error-code={errorCode}>
+          {errorStatus.message} ({errorCode})
         </div>
       </div>
     );
@@ -589,6 +582,7 @@ function App() {
                     renderQuote={(quoteUrl, quoteDepth, quoteMaxDepth) => (
                       <QuoteObject quoteUrl={quoteUrl} depth={quoteDepth} maxDepth={quoteMaxDepth} />
                     )}
+                    showInReplyTo={true}
                   />
                 )}
                 {!getContent(previewData) && getQuoteUrl(previewData) && (
@@ -622,6 +616,7 @@ function App() {
                     renderQuote={(quoteUrl, quoteDepth, quoteMaxDepth) => (
                       <QuoteObject quoteUrl={quoteUrl} depth={quoteDepth} maxDepth={quoteMaxDepth} />
                     )}
+                    showInReplyTo={true}
                   />
                 )}
               </>

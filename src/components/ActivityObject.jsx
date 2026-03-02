@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { getContent, getPollData, getQuoteUrl, getAudience, getLinkPreviews } from '../utils/activityPubHelpers';
+import { getContent, getPollData, getQuoteUrl, getAudience, getLinkPreviews, getReplyTo, getReplies } from '../utils/activityPubHelpers';
 import { renderHtmlWithEmojis, getMediaUrl } from '../utils/emojiUtils';
 import UserHeader from './UserHeader';
 import Poll from './Poll';
 import LinkPreview from './LinkPreview';
+import ReplyObject from './ReplyObject';
+import RepliesObject from './RepliesObject';
+
 export default function ActivityObject({ 
   data, 
   signedMedia = {}, 
@@ -16,7 +19,9 @@ export default function ActivityObject({
   depth = 0,
   maxDepth = 3,
   containerStyle = {},
-  renderQuote = null
+  renderQuote = null,
+  showInReplyTo = false,
+  showReplies = true
 }) {
   const [showContent, setShowContent] = useState(false);
 
@@ -27,9 +32,21 @@ export default function ActivityObject({
   const shouldShowContent = !hasCW || showContent;
   const shouldShowAttachments = !hasCW || showContent;
   const mergedSignedMedia = { ...signedMedia, ...(actorSignedMedia || {}) };
+  const replyTo = getReplyTo(data);
+  const replies = getReplies(data);
 
   return (
     <div className="content-html" style={containerStyle}>
+      {showInReplyTo && replyTo && (
+        <ReplyObject
+          replyUrl={replyTo}
+          fullscreenMedia={fullscreenMedia}
+          setFullscreenMedia={setFullscreenMedia}
+          showSensitiveMedia={showSensitiveMedia}
+          setShowSensitiveMedia={setShowSensitiveMedia}
+          renderQuote={renderQuote}
+        />
+      )}
       {(data.published || data.attributedTo) && (
         <UserHeader
           nickname={nickname}
@@ -137,7 +154,7 @@ export default function ActivityObject({
                           href={url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ display: 'block', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '4px', textDecoration: 'none', color: '#0066cc' }}
+                          className="content-html__attachment-link"
                         >
                           {name || url}
                         </a>
@@ -188,7 +205,18 @@ export default function ActivityObject({
       {shouldShowContent && getQuoteUrl(data) && renderQuote && (
         renderQuote(getQuoteUrl(data), depth, maxDepth)
       )}
+      {replies && showReplies && (
+        <RepliesObject
+          repliesUrl={replies}
+          depth={depth}
+          maxDepth={maxDepth}
+          renderQuote={renderQuote}
+          fullscreenMedia={fullscreenMedia}
+          setFullscreenMedia={setFullscreenMedia}
+          showSensitiveMedia={showSensitiveMedia}
+          setShowSensitiveMedia={setShowSensitiveMedia}
+        />
+      )}
     </div>
   );
 }
-

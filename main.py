@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import ipaddress
+import json
 import os
 import secrets
 import tempfile
@@ -41,6 +42,13 @@ CACHE_SIZE_LIMIT = int(os.environ.get('CACHE_SIZE_LIMIT', 500 * 1024 * 1024))  #
 
 # Initialize disk cache
 cache = diskcache.Cache(CACHE_DIR, size_limit=CACHE_SIZE_LIMIT)
+
+
+def etag_for_json(data):
+    """Generate strong ETag for JSON-serializable data (for client caching)."""
+    canonical = json.dumps(data, sort_keys=True, separators=(',', ':'))
+    digest = hashlib.sha256(canonical.encode()).hexdigest()
+    return f'"{digest}"'
 
 
 def sign_media_url(url):
@@ -177,7 +185,7 @@ async def health():
 
 
 @app.get("/api/activity")
-async def process_url(url: str = Query(..., description="ActivityPub URL to fetch")):
+async def process_url(request: Request, url: str = Query(..., description="ActivityPub URL to fetch")):
     url = url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL is required")
@@ -220,9 +228,12 @@ async def process_url(url: str = Query(..., description="ActivityPub URL to fetc
                 if signed_media:
                     result["_signed_media"] = signed_media
 
+                etag = etag_for_json(result)
+                if etag and etag in (request.headers.get("if-none-match") or ""):
+                    return Response(status_code=304, headers={'Cache-Control': 'public, max-age=300', 'ETag': etag, 'X-Cache': 'HIT'})
                 return JSONResponse(
                     content=result,
-                    headers={'Cache-Control': 'public, max-age=300', 'X-Cache': 'HIT'}
+                    headers={'Cache-Control': 'public, max-age=300', 'ETag': etag, 'X-Cache': 'HIT'}
                 )
 
             # Check for HTTP error status codes
@@ -302,9 +313,12 @@ async def process_url(url: str = Query(..., description="ActivityPub URL to fetc
 
             # UPDATED if we had cache but upstream changed, MISS if no cache existed
             cache_status = 'UPDATED' if had_cache else 'MISS'
+            etag = etag_for_json(result)
+            if etag and etag in (request.headers.get("if-none-match") or ""):
+                return Response(status_code=304, headers={'Cache-Control': 'public, max-age=300', 'ETag': etag, 'X-Cache': cache_status})
             return JSONResponse(
                 content=result,
-                headers={'Cache-Control': 'public, max-age=300', 'X-Cache': cache_status}
+                headers={'Cache-Control': 'public, max-age=300', 'ETag': etag, 'X-Cache': cache_status}
             )
 
         except httpx.HTTPStatusError as e:
@@ -332,7 +346,7 @@ async def process_url(url: str = Query(..., description="ActivityPub URL to fetc
 
 
 def build_webfinger_result(actor_data, actor_url_for_id, cache_status='MISS'):
-    """Helper to build webfinger result from actor data"""
+    """Build webfinger result dict and headers (caller adds ETag and returns response)."""
     parsed = urlparse(actor_url_for_id)
     domain = parsed.netloc or ''
 
@@ -353,17 +367,21 @@ def build_webfinger_result(actor_data, actor_url_for_id, cache_status='MISS'):
     if signed_media:
         result["_signed_media"] = signed_media
 
-    return JSONResponse(
-        content=result,
-        headers={
-            'Cache-Control': 'public, max-age=300',
-            'X-Cache': cache_status
-        }
-    )
+    headers = {'Cache-Control': 'public, max-age=300', 'X-Cache': cache_status}
+    return result, headers
+
+
+def webfinger_response(result, headers, request: Request):
+    """Return JSONResponse or 304 based on If-None-Match."""
+    etag = etag_for_json(result)
+    if etag and etag in (request.headers.get("if-none-match") or ""):
+        return Response(status_code=304, headers={**headers, 'ETag': etag})
+    return JSONResponse(content=result, headers={**headers, 'ETag': etag})
 
 
 @app.get("/api/webfinger")
 async def webfinger(
+    request: Request,
     resource: str = Query(None, description="Webfinger resource (acct:user@domain)"),
     actor_url: str = Query(None, description="Direct actor URL")
 ):
@@ -400,7 +418,8 @@ async def webfinger(
 
                 # If 304 Not Modified, return cached content
                 if response.status_code == 304 and cached is not None:
-                    return build_webfinger_result(actor_data, resolved_actor_url, cache_status='HIT')
+                    result, headers = build_webfinger_result(actor_data, resolved_actor_url, cache_status='HIT')
+                    return webfinger_response(result, headers, request)
 
                 response.raise_for_status()
                 actor_data = response.json()
@@ -413,7 +432,8 @@ async def webfinger(
                 cache.set(cache_key, (actor_data, actor_url, new_etag, new_last_modified), expire=ACTIVITY_CACHE_TTL)
 
                 cache_status = 'UPDATED' if had_cache else 'MISS'
-                return build_webfinger_result(actor_data, actor_url, cache_status=cache_status)
+                result, headers = build_webfinger_result(actor_data, actor_url, cache_status=cache_status)
+                return webfinger_response(result, headers, request)
 
             # Otherwise, try webfinger lookup
             if resource.startswith('acct:'):
@@ -461,7 +481,8 @@ async def webfinger(
                 )
 
                 cache_status = 'UPDATED' if had_cache else 'MISS'
-                return build_webfinger_result(actor_data, resolved_actor_url, cache_status=cache_status)
+                result, headers = build_webfinger_result(actor_data, resolved_actor_url, cache_status=cache_status)
+                return webfinger_response(result, headers, request)
 
             except httpx.HTTPError:
                 # If webfinger fails, try to use resource as direct actor URL
@@ -478,7 +499,8 @@ async def webfinger(
                     cache.set(cache_key, (actor_data, resource, new_etag, new_last_modified), expire=ACTIVITY_CACHE_TTL)
 
                     cache_status = 'UPDATED' if had_cache else 'MISS'
-                    return build_webfinger_result(actor_data, resource, cache_status=cache_status)
+                    result, headers = build_webfinger_result(actor_data, resource, cache_status=cache_status)
+                    return webfinger_response(result, headers, request)
                 raise
 
         except httpx.HTTPError as e:
