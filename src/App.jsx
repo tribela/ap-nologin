@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneLight, oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import './App.scss';
 import { getMediaUrl } from './utils/emojiUtils';
 import { getQuoteUrl, getContent } from './utils/activityPubHelpers';
@@ -273,6 +275,16 @@ function App() {
   const [showContent, setShowContent] = useState(false);
   const [showSensitiveMedia, setShowSensitiveMedia] = useState({});
   const [fullscreenMedia, setFullscreenMedia] = useState(null);
+  const [darkMode, setDarkMode] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+
+  useEffect(() => {
+    const m = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e) => setDarkMode(e.matches);
+    m.addEventListener('change', handler);
+    return () => m.removeEventListener('change', handler);
+  }, []);
 
   // Fetch activity data for a given URL
   const fetchActivity = async (targetUrl) => {
@@ -639,8 +651,17 @@ function App() {
             </div>
             <div>
               {showRawJson && (
-                <div className="preview-content" style={{ marginTop: '0.5rem' }}>
-                  <pre>{preview}</pre>
+                <div className="preview-content preview-content--syntax" style={{ marginTop: '0.5rem' }}>
+                  <SyntaxHighlighter
+                    language="json"
+                    style={darkMode ? oneDark : oneLight}
+                    customStyle={{ margin: 0, padding: '1rem', background: 'transparent', border: 'none' }}
+                    codeTagProps={{ style: { fontFamily: 'inherit' } }}
+                    showLineNumbers
+                    wrapLongLines
+                  >
+                    {preview}
+                  </SyntaxHighlighter>
                 </div>
               )}
             </div>

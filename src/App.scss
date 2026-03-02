@@ -304,6 +304,28 @@ section {
     white-space: pre-wrap;
     word-wrap: break-word;
   }
+
+  &--syntax {
+    padding: 0;
+    overflow-x: auto;
+
+    pre {
+      margin: 0 !important;
+      padding: $spacing-lg !important;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', source-code-pro, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .react-syntax-highlighter-line-number {
+      min-width: 2.5em;
+      padding-right: 1em;
+      user-select: none;
+    }
+  }
 }
 
 .activitypub-info {
