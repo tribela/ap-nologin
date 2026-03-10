@@ -675,9 +675,19 @@ async def serve(path: str, request: Request):
     if path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Not found")
 
-    static_path = os.path.join(static_dir, path)
-    # If the file exists, serve it
+    # Validate and sanitize path to prevent traversal attacks
+    normalized_path = os.path.normpath(path)
+    if normalized_path.startswith("..") or os.path.isabs(normalized_path):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    static_path = os.path.join(static_dir, normalized_path)
+    # If the file exists, serve it with security check
     if path and os.path.exists(static_path) and os.path.isfile(static_path):
+        # Verify resolved path is within static_dir
+        real_path = os.path.realpath(static_path)
+        real_static_dir = os.path.realpath(static_dir)
+        if not real_path.startswith(real_static_dir + os.sep):
+            raise HTTPException(status_code=403, detail="Forbidden")
         return FileResponse(static_path)
     # Otherwise serve index.html for SPA routing
     index_path = os.path.join(static_dir, "index.html")
