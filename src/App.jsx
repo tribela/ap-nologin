@@ -386,8 +386,8 @@ function App() {
   const handleShare = async () => {
     // Build share URL - keep URL readable but encode whitespace
     const baseUrl = window.location.origin + window.location.pathname;
-    const safeUrl = url.trim().replace(/\s/g, '%20');
-    const shareUrl = url.trim() ? `${baseUrl}?url=${safeUrl}` : baseUrl;
+    const encodedUrl = url.trim() ? encodeURIComponent(url.trim()) : '';
+    const shareUrl = encodedUrl ? `${baseUrl}?url=${encodedUrl}` : baseUrl;
 
     if (!navigator.share) {
       // Fallback: copy to clipboard
