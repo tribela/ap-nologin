@@ -17,14 +17,18 @@ from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="AP NoLogin", description="View ActivityPub notes without login")
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS middleware - only needed for browser dev, disabled in production
+is_dev = os.environ.get('DEBUG', '').lower() in ('true', '1') or os.environ.get('FLASK_DEBUG', '').lower() == 'true'
+if is_dev:
+    # Allow all origins in development for browser access
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+# CORS is disabled in production (server-to-server doesn't need it)
 
 # HMAC secret key for signing media URLs
 # Use environment variable if set, otherwise generate a random secret
